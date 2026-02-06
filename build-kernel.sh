@@ -22,11 +22,12 @@ error() {
 }
 
 # Check if architecture is provided
-if [ $# -ne 1 ]; then
-    error "Usage: $0 <architecture>\n  Supported architectures: x86_64, aarch64"
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    error "Usage: $0 <architecture> [kernel_version]\n  Supported architectures: x86_64, aarch64\n  kernel_version: Optional (e.g., 6.1). If not provided, uses latest stable."
 fi
 
 ARCH=$1
+KERNEL_VERSION_ARG="${2:-}"
 BUILD_DIR="build"
 ARTIFACTS_DIR="artifacts"
 
@@ -56,13 +57,19 @@ fi
 # Create build and artifacts directories
 mkdir -p "$BUILD_DIR" "$ARTIFACTS_DIR"
 
-# Fetch latest stable kernel version
-info "Fetching latest stable kernel version from kernel.org..."
-KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
-if [ -z "$KERNEL_VERSION" ]; then
-    error "Failed to fetch kernel version from kernel.org"
+# Determine kernel version to build
+if [ -n "$KERNEL_VERSION_ARG" ]; then
+    KERNEL_VERSION="$KERNEL_VERSION_ARG"
+    info "Using provided kernel version: $KERNEL_VERSION"
+else
+    # Fetch latest stable kernel version
+    info "Fetching latest stable kernel version from kernel.org..."
+    KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
+    if [ -z "$KERNEL_VERSION" ]; then
+        error "Failed to fetch kernel version from kernel.org"
+    fi
+    info "Latest stable kernel version: $KERNEL_VERSION"
 fi
-info "Latest stable kernel version: $KERNEL_VERSION"
 
 # Extract major version for download URL
 MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f1)

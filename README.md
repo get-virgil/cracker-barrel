@@ -65,18 +65,24 @@ sudo apt-get install -y gcc-aarch64-linux-gnu
 
 ### Build Script
 
-Run the build script with your desired architecture:
+Run the build script with your desired architecture and optional kernel version:
 
 ```bash
-# Build for x86_64
+# Build latest stable kernel for x86_64
 ./build-kernel.sh x86_64
+
+# Build specific kernel version for x86_64
+./build-kernel.sh x86_64 6.1
 
 # Build for aarch64
 ./build-kernel.sh aarch64
+
+# Build specific version for aarch64
+./build-kernel.sh aarch64 6.1
 ```
 
 The script will:
-1. Fetch the latest stable kernel version from kernel.org
+1. Use provided kernel version, or fetch the latest stable from kernel.org
 2. Download and extract kernel source
 3. Apply Firecracker-compatible configuration
 4. Build the kernel
