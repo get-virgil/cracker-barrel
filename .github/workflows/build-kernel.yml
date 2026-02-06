@@ -153,6 +153,7 @@ jobs:
           path: test-rootfs.ext4
           key: test-rootfs-${{ steps.rootfs-script-hash.outputs.hash }}
           restore-keys: |
+            test-rootfs-${{ github.ref_name }}
             test-rootfs-
 
       - name: Install Firecracker
