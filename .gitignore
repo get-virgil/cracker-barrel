@@ -1,0 +1,42 @@
+# Build directories
+build/
+artifacts/
+
+# Kernel source tarballs
+*.tar.xz
+*.tar.gz
+
+# Compressed kernels
+vmlinux*.xz
+Image*.xz
+
+# Checksums
+*.sha256
+SHA256SUMS
+
+# Kernel binaries
+vmlinux
+vmlinux-*
+Image
+Image-*
+
+# Kernel build artifacts
+*.o
+*.ko
+*.o.cmd
+*.ko.cmd
+.tmp_versions/
+Module.symvers
+modules.builtin
+modules.order
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,210 @@
+name: Build Firecracker-Compatible Kernel
+
+on:
+  # Run daily at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  check-version:
+    name: Check Latest Kernel Version
+    runs-on: ubuntu-latest
+    outputs:
+      kernel_version: ${{ steps.get_version.outputs.version }}
+      should_build: ${{ steps.check_release.outputs.should_build }}
+
+    steps:
+      - name: Get latest stable kernel version
+        id: get_version
+        run: |
+          KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
+          echo "version=${KERNEL_VERSION}" >> $GITHUB_OUTPUT
+          echo "Latest stable kernel version: ${KERNEL_VERSION}"
+
+      - name: Check if release already exists
+        id: check_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          KERNEL_VERSION="${{ steps.get_version.outputs.version }}"
+          TAG="v${KERNEL_VERSION}"
+
+          # Check if release exists
+          if gh release view "$TAG" --repo ${{ github.repository }} > /dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping build"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Release $TAG does not exist, proceeding with build"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    name: Build Kernel (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libncurses-dev \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            bc \
+            wget \
+            xz-utils \
+            jq
+
+          # Install cross-compilation tools for aarch64
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
+
+      - name: Cache kernel source
+        uses: actions/cache@v4
+        with:
+          path: build/linux-*.tar.xz
+          key: kernel-source-${{ needs.check-version.outputs.kernel_version }}
+
+      - name: Build kernel
+        run: |
+          ./build-kernel.sh ${{ matrix.arch }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ matrix.arch }}-${{ needs.check-version.outputs.kernel_version }}
+          path: artifacts/*
+          retention-days: 7
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [check-version, build]
+    if: needs.check-version.outputs.should_build == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release-artifacts
+
+          # Move all artifacts to release-artifacts directory
+          find all-artifacts -type f -exec mv {} release-artifacts/ \;
+
+          # Generate combined SHA256SUMS file
+          cd release-artifacts
+
+          # Combine all individual .sha256 files into SHA256SUMS
+          cat *.sha256 > SHA256SUMS
+          rm *.sha256
+
+          echo "Release artifacts:"
+          ls -lh
+
+      - name: Create release notes
+        run: |
+          KERNEL_VERSION="${{ needs.check-version.outputs.kernel_version }}"
+          cat > release-notes.md << EOF
+          # Linux Kernel ${KERNEL_VERSION} - Firecracker Compatible
+
+          ## Overview
+
+          Pre-built Linux kernel ${KERNEL_VERSION} configured for AWS Firecracker microVMs.
+
+          ## Architectures
+
+          - **x86_64**: Intel/AMD 64-bit processors
+          - **aarch64**: ARM 64-bit processors (e.g., AWS Graviton)
+
+          ## Artifacts
+
+          - \`vmlinux-${KERNEL_VERSION}-x86_64.xz\` - Compressed kernel for x86_64
+          - \`Image-${KERNEL_VERSION}-aarch64.xz\` - Compressed kernel for aarch64
+          - \`config-${KERNEL_VERSION}-x86_64\` - Kernel configuration for x86_64
+          - \`config-${KERNEL_VERSION}-aarch64\` - Kernel configuration for aarch64
+          - \`SHA256SUMS\` - Checksums of decompressed kernels
+
+          ## Usage
+
+          1. Download the appropriate kernel for your architecture
+          2. Decompress: \`xz -d vmlinux-${KERNEL_VERSION}-x86_64.xz\`
+          3. Verify checksum: \`sha256sum -c SHA256SUMS\`
+          4. Use with Firecracker
+
+          ## Kernel Configuration
+
+          Based on Firecracker's official microvm-kernel configurations with essential features:
+          - KVM guest support
+          - VirtIO drivers (block, network, console, balloon)
+          - Minimal footprint for fast boot times
+          - Security hardening (SECCOMP, SELinux, Spectre/Meltdown mitigations)
+
+          ## Build Information
+
+          - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          - **Upstream Release**: [kernel.org - Linux ${KERNEL_VERSION}](https://kernel.org)
+          - **Configuration Source**: [Firecracker Guest Configs](https://github.com/firecracker-microvm/firecracker/tree/main/resources/guest_configs)
+
+          ## Verification
+
+          To verify the integrity of the downloaded kernel:
+
+          \`\`\`bash
+          # Download and decompress
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/vmlinux-${KERNEL_VERSION}-x86_64.xz
+          xz -d vmlinux-${KERNEL_VERSION}-x86_64.xz
+
+          # Download checksums
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/SHA256SUMS
+
+          # Verify
+          sha256sum -c SHA256SUMS --ignore-missing
+          \`\`\`
+
+          ---
+
+          Built automatically by [cracker-barrel](https://github.com/${{ github.repository }})
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          KERNEL_VERSION="${{ needs.check-version.outputs.kernel_version }}"
+          TAG="v${KERNEL_VERSION}"
+
+          # Create release
+          gh release create "$TAG" \
+            --title "Linux Kernel ${KERNEL_VERSION} - Firecracker Compatible" \
+            --notes-file release-notes.md \
+            --repo ${{ github.repository }} \
+            release-artifacts/*
+
+          echo "Release $TAG created successfully!"
