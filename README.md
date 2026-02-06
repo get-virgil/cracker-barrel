@@ -125,14 +125,39 @@ Kernel configurations are based on Firecracker's official guest configs and incl
 
 The workflow (`.github/workflows/build-kernel.yml`) performs the following:
 
-1. **Check Version** - Fetches latest stable kernel from kernel.org
+1. **Check Version** - Fetches latest stable kernel from kernel.org (or uses provided version)
 2. **Check Existing Release** - Skips build if release already exists
 3. **Build Matrix** - Builds for both x86_64 and aarch64 in parallel
 4. **Create Release** - Publishes artifacts to GitHub Releases
 
 ### Manual Trigger
 
-You can manually trigger a build from the Actions tab in GitHub by selecting "Build Firecracker-Compatible Kernel" and clicking "Run workflow".
+#### Via GitHub UI
+
+You can manually trigger a build from the Actions tab in GitHub:
+
+1. Go to the "Actions" tab
+2. Select "Build Firecracker-Compatible Kernel"
+3. Click "Run workflow"
+4. Optionally specify a kernel version (e.g., `6.18.8`)
+   - Leave empty to build the latest stable version
+   - Specify a version to build a specific kernel release
+
+#### Via GitHub CLI
+
+Use the `gh` CLI to trigger builds from the command line:
+
+```bash
+# Build latest stable kernel
+gh workflow run build-kernel.yml
+
+# Build a specific kernel version
+gh workflow run build-kernel.yml -f kernel_version=6.18.8
+
+# Monitor the workflow run
+gh run list --workflow=build-kernel.yml --limit 5
+gh run watch
+```
 
 ### Schedule
 

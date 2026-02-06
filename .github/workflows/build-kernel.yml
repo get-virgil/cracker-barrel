@@ -7,25 +7,35 @@ on:
 
   # Allow manual trigger
   workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Kernel version to build (e.g., 6.18.8). Leave empty for latest stable.'
+        required: false
+        type: string
 
 permissions:
   contents: write  # Required for creating releases
 
 jobs:
   check-version:
-    name: Check Latest Kernel Version
+    name: Check Kernel Version
     runs-on: ubuntu-latest
     outputs:
       kernel_version: ${{ steps.get_version.outputs.version }}
       should_build: ${{ steps.check_release.outputs.should_build }}
 
     steps:
-      - name: Get latest stable kernel version
+      - name: Get kernel version
         id: get_version
         run: |
-          KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
+          if [ -n "${{ inputs.kernel_version }}" ]; then
+            KERNEL_VERSION="${{ inputs.kernel_version }}"
+            echo "Using provided kernel version: ${KERNEL_VERSION}"
+          else
+            KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
+            echo "Using latest stable kernel version: ${KERNEL_VERSION}"
+          fi
           echo "version=${KERNEL_VERSION}" >> $GITHUB_OUTPUT
-          echo "Latest stable kernel version: ${KERNEL_VERSION}"
 
       - name: Check if release already exists
         id: check_release
