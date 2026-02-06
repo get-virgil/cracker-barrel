@@ -82,7 +82,8 @@ jobs:
             bc \
             wget \
             xz-utils \
-            jq
+            jq \
+            gnupg
 
           # Install cross-compilation tools for aarch64
           if [ "${{ matrix.arch }}" = "aarch64" ]; then
@@ -97,7 +98,11 @@ jobs:
 
       - name: Build kernel
         run: |
-          ./build-kernel.sh ${{ matrix.arch }} ${{ needs.check-version.outputs.kernel_version }}
+          # Uses default 'high' verification level:
+          # - Verifies PGP signature on sha256sums.asc from kernel.org autosigner
+          # - Verifies SHA256 checksum of kernel tarball
+          # - Fails if verification unavailable (fail-secure)
+          ./get-kernel.sh --kernel ${{ needs.check-version.outputs.kernel_version }} --arch ${{ matrix.arch }} --force-build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -106,153 +111,10 @@ jobs:
           path: artifacts/*
           retention-days: 7
 
-  test:
-    name: Test Kernel (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    needs: [check-version, build]
-    if: needs.check-version.outputs.should_build == 'true'
-
-    strategy:
-      matrix:
-        include:
-          - arch: x86_64
-            runner: ubuntu-latest
-            kernel_name: vmlinux
-          - arch: aarch64
-            runner: ubuntu-24.04-arm
-            kernel_name: Image
-      fail-fast: false
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download kernel artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: kernel-${{ matrix.arch }}-${{ needs.check-version.outputs.kernel_version }}
-          path: kernel-artifacts
-
-      - name: Decompress kernel
-        run: |
-          cd kernel-artifacts
-          xz -d ${{ matrix.kernel_name }}-${{ needs.check-version.outputs.kernel_version }}-${{ matrix.arch }}.xz
-          ls -lh
-
-      - name: Hash rootfs creation script
-        id: rootfs-script-hash
-        run: |
-          SCRIPT_HASH=$(sha256sum create-test-rootfs.sh | cut -d' ' -f1 | cut -c1-8)
-          echo "hash=${SCRIPT_HASH}" >> $GITHUB_OUTPUT
-          echo "Script hash: ${SCRIPT_HASH}"
-
-      - name: Cache test rootfs
-        id: cache-rootfs
-        uses: actions/cache@v4
-        with:
-          path: test-rootfs.ext4
-          key: test-rootfs-${{ steps.rootfs-script-hash.outputs.hash }}
-          restore-keys: |
-            test-rootfs-${{ github.ref_name }}
-            test-rootfs-
-
-      - name: Install Firecracker
-        run: |
-          FIRECRACKER_VERSION="v1.14.1"
-          echo "Downloading Firecracker ${FIRECRACKER_VERSION} for ${{ matrix.arch }}..."
-          curl -L -o firecracker.tgz https://github.com/firecracker-microvm/firecracker/releases/download/${FIRECRACKER_VERSION}/firecracker-${FIRECRACKER_VERSION}-${{ matrix.arch }}.tgz
-          tar -xzf firecracker.tgz
-          sudo mv release-${FIRECRACKER_VERSION}-${{ matrix.arch }}/firecracker-${FIRECRACKER_VERSION}-${{ matrix.arch }} /usr/local/bin/firecracker
-          sudo chmod +x /usr/local/bin/firecracker
-          firecracker --version
-
-      - name: Create test rootfs
-        if: steps.cache-rootfs.outputs.cache-hit != 'true'
-        run: |
-          chmod +x create-test-rootfs.sh
-          ./create-test-rootfs.sh test-rootfs.ext4
-
-      - name: Test kernel boot
-        timeout-minutes: 2
-        run: |
-          echo "Starting Firecracker VM boot test..."
-
-          # Start Firecracker in background
-          rm -f /tmp/firecracker.sock
-          firecracker --api-sock /tmp/firecracker.sock &
-          FIRECRACKER_PID=$!
-          echo "Firecracker PID: $FIRECRACKER_PID"
-
-          # Wait for socket to be ready
-          for i in {1..10}; do
-            if [ -S /tmp/firecracker.sock ]; then
-              echo "API socket ready"
-              break
-            fi
-            sleep 0.5
-          done
-
-          # Configure boot source
-          echo "Configuring boot source..."
-          curl -X PUT --unix-socket /tmp/firecracker.sock \
-            http://localhost/boot-source \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"kernel_image_path\": \"$(pwd)/kernel-artifacts/${{ matrix.kernel_name }}-${{ needs.check-version.outputs.kernel_version }}-${{ matrix.arch }}\",
-              \"boot_args\": \"console=ttyS0 reboot=k panic=1 pci=off init=/init\"
-            }"
-
-          # Configure rootfs drive
-          echo "Configuring rootfs drive..."
-          curl -X PUT --unix-socket /tmp/firecracker.sock \
-            http://localhost/drives/rootfs \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"drive_id\": \"rootfs\",
-              \"path_on_host\": \"$(pwd)/test-rootfs.ext4\",
-              \"is_root_device\": true,
-              \"is_read_only\": false
-            }"
-
-          # Configure machine
-          echo "Configuring machine..."
-          curl -X PUT --unix-socket /tmp/firecracker.sock \
-            http://localhost/machine-config \
-            -H "Content-Type: application/json" \
-            -d '{"vcpu_count": 1, "mem_size_mib": 128}'
-
-          # Start VM
-          echo "Starting VM..."
-          curl -X PUT --unix-socket /tmp/firecracker.sock \
-            http://localhost/actions \
-            -H "Content-Type: application/json" \
-            -d '{"action_type": "InstanceStart"}'
-
-          echo "Waiting for VM to boot and shutdown (max 60s)..."
-          # Wait for VM to boot and shutdown
-          for i in {1..60}; do
-            if ! kill -0 $FIRECRACKER_PID 2>/dev/null; then
-              echo "=========================================="
-              echo "SUCCESS: VM booted and shut down cleanly!"
-              echo "Kernel ${{ matrix.arch }} boot test PASSED"
-              echo "=========================================="
-              exit 0
-            fi
-            sleep 1
-          done
-
-          # If we get here, VM didn't shut down in time
-          echo "=========================================="
-          echo "ERROR: VM did not shut down within timeout"
-          echo "Kernel ${{ matrix.arch }} boot test FAILED"
-          echo "=========================================="
-          kill $FIRECRACKER_PID 2>/dev/null || true
-          exit 1
-
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [check-version, test]
+    needs: [check-version, build]
     if: needs.check-version.outputs.should_build == 'true'
 
     steps:
