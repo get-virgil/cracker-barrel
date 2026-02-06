@@ -128,7 +128,12 @@ The workflow (`.github/workflows/build-kernel.yml`) performs the following:
 1. **Check Version** - Fetches latest stable kernel from kernel.org (or uses provided version)
 2. **Check Existing Release** - Skips build if release already exists
 3. **Build Matrix** - Builds for both x86_64 and aarch64 in parallel
-4. **Create Release** - Publishes artifacts to GitHub Releases
+4. **Test Matrix** - Tests both kernels by booting minimal VMs with Firecracker v1.14.1
+   - x86_64 tests run on standard ubuntu-latest runners
+   - aarch64 tests run natively on ubuntu-24.04-arm runners (free for public repos)
+   - Test rootfs is cached using the script hash (only rebuilt when `create-test-rootfs.sh` changes)
+   - Each kernel must successfully boot and shut down cleanly
+5. **Create Release** - Publishes artifacts to GitHub Releases (only if all tests pass)
 
 ### Manual Trigger
 
@@ -175,12 +180,13 @@ on:
 .
 ├── .github/
 │   └── workflows/
-│       └── build-kernel.yml    # GitHub Actions workflow
+│       └── build-kernel.yml              # GitHub Actions workflow
 ├── configs/
-│   ├── microvm-kernel-x86_64.config    # Firecracker config for x86_64
-│   └── microvm-kernel-aarch64.config   # Firecracker config for aarch64
-├── build-kernel.sh             # Main build script
-└── README.md                   # This file
+│   ├── microvm-kernel-x86_64.config      # Firecracker config for x86_64
+│   └── microvm-kernel-aarch64.config     # Firecracker config for aarch64
+├── build-kernel.sh                       # Main build script
+├── create-test-rootfs.sh                 # Test rootfs creation script
+└── README.md                             # This file
 ```
 
 ## How It Works
@@ -230,8 +236,9 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 - [ ] Support for longterm kernels (e.g., 6.6.x LTS)
 - [ ] Custom kernel configuration options
 - [ ] Additional architectures (e.g., RISC-V)
-- [ ] Integration tests with Firecracker
+- [x] Integration tests with Firecracker
 - [ ] Build time optimizations
+- [ ] Extended boot tests with virtio device verification
 
 ## License
 
