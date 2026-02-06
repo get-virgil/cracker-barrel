@@ -151,9 +151,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: test-rootfs.ext4
-          key: test-rootfs-${{ steps.rootfs-script-hash.outputs.hash }}-${{ github.sha }}
+          key: test-rootfs-${{ steps.rootfs-script-hash.outputs.hash }}
           restore-keys: |
-            test-rootfs-${{ steps.rootfs-script-hash.outputs.hash }}-
             test-rootfs-
 
       - name: Install Firecracker
