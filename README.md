@@ -283,6 +283,56 @@ task --list
 
 All Task commands are wrappers around the shell scripts, so you can use either approach.
 
+## Local Archive
+
+When you sign artifacts locally with `task signing:sign-artifacts`, they're automatically archived to `archive/{version}/` (git-ignored). This creates a local mirror of what gets published to GitHub releases, enabling fully local-first development.
+
+### Archive Structure
+
+```
+archive/
+├── index.json              # Quick lookup of available kernels per architecture
+├── 6.18.9/
+│   ├── vmlinux-6.18.9-x86_64.xz
+│   ├── Image-6.18.9-aarch64.xz
+│   ├── config-6.18.9-x86_64
+│   ├── config-6.18.9-aarch64
+│   ├── SHA256SUMS
+│   ├── SHA256SUMS.asc
+│   └── cracker-barrel-release.asc    # Public key (same as releases)
+├── 6.18.8/
+│   └── ...
+└── ...
+```
+
+### Index File
+
+The `archive/index.json` file tracks kernel versions and their file paths for each architecture:
+
+```json
+{
+  "x86_64": {
+    "6.18.9": "6.18.9/vmlinux-6.18.9-x86_64.xz",
+    "6.18.8": "6.18.8/vmlinux-6.18.8-x86_64.xz"
+  },
+  "aarch64": {
+    "6.18.9": "6.18.9/Image-6.18.9-aarch64.xz",
+    "6.18.8": "6.18.8/Image-6.18.8-aarch64.xz"
+  }
+}
+```
+
+The index is automatically updated when you sign new artifacts.
+
+### Benefits
+
+- **Offline Development**: Keep all signed kernels locally without GitHub dependency
+- **Fast Access**: Instantly access any previously built kernel
+- **Testing**: Test release structure locally before publishing
+- **Mirrors Releases**: Exact same file layout as GitHub releases
+
+The archive directory is automatically populated when you run `task signing:sign-artifacts` and requires no manual management.
+
 ## Security
 
 ### Verification Model

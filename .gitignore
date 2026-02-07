@@ -3,6 +3,12 @@ build/
 artifacts/
 bin/
 
+# Local archive of signed releases (local-first development)
+# Automatically populated by sign-artifacts.sh
+# Mirrors GitHub release structure: archive/{version}/
+# Contains: signed kernels, checksums, signatures, public key
+archive/
+
 # PGP signing keys
 # (managed by keys/.gitignore)
 .gnupg/

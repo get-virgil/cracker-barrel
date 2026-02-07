@@ -98,6 +98,12 @@ tasks:
 
       Creates SHA256SUMS.asc (detached PGP signature)
 
+      After signing, automatically archives signed artifacts to archive/{version}/
+      for local-first development (git-ignored, mirrors GitHub release structure)
+
+      Also maintains archive/index.json with kernel versions and file paths per architecture:
+        {"x86_64": {"6.18.9": "6.18.9/vmlinux-6.18.9-x86_64.xz", ...}, "aarch64": {...}}
+
       Requirements:
         - Signing key available (local: .gnupg/, CI: SIGNING_KEY env var)
         - SHA256SUMS file exists in target directory
