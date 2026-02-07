@@ -10,6 +10,34 @@ vars:
   FIRECRACKER_VERSION: ""
 
 tasks:
+  check-checksums:
+    desc: Check if checksums are available for a kernel version
+    silent: true
+    summary: |
+      Check if kernel.org has published checksums for a specific kernel version
+
+      This is useful for CI/CD to avoid failing builds when a kernel is just released
+      but checksums haven't been published yet.
+
+      Options:
+        KERNEL_VERSION (env var)  Specific kernel version (required)
+
+      Examples:
+        KERNEL_VERSION=6.18.9 task kernel:check-checksums
+
+      Exit codes:
+        0 - Checksums are available
+        1 - Checksums are not available yet (soft fail - timing issue)
+        2 - Error occurred (hard fail - invalid version or network error)
+    cmds:
+      - |
+        if [ -z "${KERNEL_VERSION}" ]; then
+          echo "Error: KERNEL_VERSION environment variable is required" >&2
+          echo "Usage: KERNEL_VERSION=6.1 task kernel:check-checksums" >&2
+          exit 2
+        fi
+        ./scripts/kernel/check-checksums-available.sh --kernel "${KERNEL_VERSION}"
+
   get:
     desc: "Get kernel (smart: download or build)"
     silent: true

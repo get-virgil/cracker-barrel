@@ -2,9 +2,9 @@
 name: Build Firecracker-Compatible Kernel
 
 on:
-  # Run daily at 2 AM UTC
+  # Run every 4 hours to catch new kernel releases quickly
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 */4 * * *'
 
   # Allow manual trigger
   workflow_dispatch:
@@ -23,9 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       kernel_version: ${{ steps.get_version.outputs.version }}
-      should_build: ${{ steps.check_release.outputs.should_build }}
+      should_build: ${{ steps.decide_build.outputs.should_build }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Task
+        uses: go-task/setup-task@v1
+
       - name: Get kernel version
         id: get_version
         run: |
@@ -42,17 +48,52 @@ jobs:
         id: check_release
         env:
           GH_TOKEN: ${{ github.token }}
+          KERNEL_VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          KERNEL_VERSION="${{ steps.get_version.outputs.version }}"
           TAG="v${KERNEL_VERSION}"
 
           # Check if release exists
           if gh release view "$TAG" --repo ${{ github.repository }} > /dev/null 2>&1; then
             echo "Release $TAG already exists, skipping build"
-            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "release_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Release $TAG does not exist, proceeding with build"
+            echo "Release $TAG does not exist, checking if we can build"
+            echo "release_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if checksums are available
+        id: check_checksums
+        if: steps.check_release.outputs.release_exists == 'false'
+        env:
+          KERNEL_VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          # Check if checksums are available (call script directly to get exact exit code)
+          if ./scripts/kernel/check-checksums-available.sh --kernel "$KERNEL_VERSION"; then
+            echo "Checksums are available, can proceed with build"
+            echo "checksums_available=true" >> $GITHUB_OUTPUT
+          else
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 1 ]; then
+              # Soft fail - timing issue (kernel exists but checksums not published yet)
+              echo "::notice title=Build Skipped::Checksums not yet available for kernel $KERNEL_VERSION. This is normal right after a kernel release. The build will be retried on the next scheduled run."
+              echo "checksums_available=false" >> $GITHUB_OUTPUT
+            else
+              # Hard fail - invalid version or network error
+              echo "::error title=Build Failed::Invalid kernel version $KERNEL_VERSION or error checking availability"
+              echo "checksums_available=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          fi
+
+      - name: Decide if we should build
+        id: decide_build
+        run: |
+          if [ "${{ steps.check_release.outputs.release_exists }}" = "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.check_checksums.outputs.checksums_available }}" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
           fi
 
   build:
