@@ -88,100 +88,80 @@ import_autosigner_key() {
 # Parse command line arguments
 ARCH=""
 KERNEL_VERSION_ARG=""
-FORCE_BUILD=false
 VERIFICATION_LEVEL="high"  # high, medium, or disabled
-GITHUB_REPO="get-virgil/cracker-barrel"
 
 # Kernel.org autosigner key (signs sha256sums.asc)
 AUTOSIGNER_KEY_ID="632D3A06589DA6B1"
 AUTOSIGNER_KEY_FINGERPRINT="B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1"
 
-# Check if using old positional syntax or new flag syntax
-if [ $# -gt 0 ] && [[ "$1" =~ ^(x86_64|aarch64)$ ]]; then
-    # Old syntax: ./get-kernel.sh x86_64 [kernel_version]
-    ARCH=$1
-    KERNEL_VERSION_ARG="${2:-}"
-else
-    # New syntax with flags: ./get-kernel.sh --kernel 6.10
-    # Auto-detect architecture
-    ARCH=$(uname -m)
-    if [ "$ARCH" = "arm64" ]; then
-        ARCH="aarch64"
-    fi
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --kernel)
-                KERNEL_VERSION_ARG="$2"
-                shift 2
-                ;;
-            --arch)
-                ARCH="$2"
-                shift 2
-                ;;
-            --force-build)
-                FORCE_BUILD=true
-                shift
-                ;;
-            --verification-level)
-                VERIFICATION_LEVEL="$2"
-                if [[ ! "$VERIFICATION_LEVEL" =~ ^(high|medium|disabled)$ ]]; then
-                    error "Invalid verification level: $VERIFICATION_LEVEL\n  Must be: high, medium, or disabled"
-                fi
-                shift 2
-                ;;
-            -h|--help)
-                echo "Usage: $0 [OPTIONS]"
-                echo "   or: $0 <architecture> [kernel_version]"
-                echo ""
-                echo "Get Firecracker-compatible Linux kernel (download or build)"
-                echo ""
-                echo "Options:"
-                echo "  --kernel VERSION               Kernel version to get (default: latest stable)"
-                echo "  --arch ARCH                    Target architecture (default: auto-detect)"
-                echo "  --force-build                  Skip download, always build from source"
-                echo "  --verification-level LEVEL     Set verification level (default: high)"
-                echo "                                   high     - PGP signature + SHA256 (strongest, default)"
-                echo "                                   medium   - SHA256 only (for systems without GPG)"
-                echo "                                   disabled - No verification (kernel too new, emergency only)"
-                echo "  -h, --help                     Show this help message"
-                echo ""
-                echo "Positional syntax (deprecated):"
-                echo "  $0 x86_64           # Get latest stable for x86_64"
-                echo "  $0 x86_64 6.1       # Get kernel 6.1 for x86_64"
-                echo ""
-                echo "Examples:"
-                echo "  $0                                        # Get latest stable (download or build)"
-                echo "  $0 --kernel 6.1                           # Get kernel 6.1"
-                echo "  $0 --force-build                          # Always build from source"
-                echo "  $0 --kernel 6.1 --arch aarch64            # Build for ARM64"
-                echo "  $0 --verification-level medium            # Skip PGP (systems without GPG)"
-                echo "  $0 --verification-level disabled          # Skip all verification (emergency)"
-                echo ""
-                echo "Verification Levels:"
-                echo "  high     - Verify PGP signature on checksums file + verify SHA256 of tarball"
-                echo "             Protects against: CDN cache poisoning, MITM attacks, tampering"
-                echo "             Requires: gpg installed, internet access to keyservers"
-                echo "             Use when: Building for production (default, recommended)"
-                echo ""
-                echo "  medium   - Verify SHA256 checksum only, skip PGP signature verification"
-                echo "             Protects against: Corrupted downloads, accidental tampering"
-                echo "             Trusts: HTTPS connection to kernel.org"
-                echo "             Use when: GPG not available, or acceptable risk for local testing"
-                echo ""
-                echo "  disabled - No verification whatsoever"
-                echo "             Protects against: Nothing"
-                echo "             Use when: Kernel just released and checksums not yet available"
-                echo "             Example: 6.18.9 released but kernel.org hasn't updated sha256sums.asc"
-                echo "             WARNING: Only use when you accept the security risks"
-                exit 0
-                ;;
-            *)
-                error "Unknown option: $1\nUse --help for usage information"
-                ;;
-        esac
-    done
+# Auto-detect architecture
+ARCH=$(uname -m)
+if [ "$ARCH" = "arm64" ]; then
+    ARCH="aarch64"
 fi
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --kernel)
+            KERNEL_VERSION_ARG="$2"
+            shift 2
+            ;;
+        --arch)
+            ARCH="$2"
+            shift 2
+            ;;
+        --verification-level)
+            VERIFICATION_LEVEL="$2"
+            if [[ ! "$VERIFICATION_LEVEL" =~ ^(high|medium|disabled)$ ]]; then
+                error "Invalid verification level: $VERIFICATION_LEVEL\n  Must be: high, medium, or disabled"
+            fi
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Build Firecracker-compatible Linux kernel from source"
+            echo ""
+            echo "Options:"
+            echo "  --kernel VERSION               Kernel version to build (default: latest stable)"
+            echo "  --arch ARCH                    Target architecture (default: auto-detect)"
+            echo "  --verification-level LEVEL     Set verification level (default: high)"
+            echo "                                   high     - PGP signature + SHA256 (strongest, default)"
+            echo "                                   medium   - SHA256 only (for systems without GPG)"
+            echo "                                   disabled - No verification (kernel too new, emergency only)"
+            echo "  -h, --help                     Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                                        # Build latest stable"
+            echo "  $0 --kernel 6.1                           # Build kernel 6.1"
+            echo "  $0 --kernel 6.1 --arch aarch64            # Build for ARM64"
+            echo "  $0 --verification-level medium            # Skip PGP (systems without GPG)"
+            echo "  $0 --verification-level disabled          # Skip all verification (emergency)"
+            echo ""
+            echo "Verification Levels:"
+            echo "  high     - Verify PGP signature on checksums file + verify SHA256 of tarball"
+            echo "             Protects against: CDN cache poisoning, MITM attacks, tampering"
+            echo "             Requires: gpg installed, internet access to keyservers"
+            echo "             Use when: Building for production (default, recommended)"
+            echo ""
+            echo "  medium   - Verify SHA256 checksum only, skip PGP signature verification"
+            echo "             Protects against: Corrupted downloads, accidental tampering"
+            echo "             Trusts: HTTPS connection to kernel.org"
+            echo "             Use when: GPG not available, or acceptable risk for local testing"
+            echo ""
+            echo "  disabled - No verification whatsoever, keeps cached sources"
+            echo "             Protects against: Nothing"
+            echo "             Use when: Kernel just released and checksums not yet available"
+            echo "             Example: 6.18.9 released but kernel.org hasn't updated sha256sums.asc"
+            echo "             Development: Keeps build/linux-* for source modifications"
+            echo "             WARNING: Only use when you accept the security risks"
+            exit 0
+            ;;
+        *)
+            error "Unknown option: $1\nUse --help for usage information"
+            ;;
+    esac
+done
 
 BUILD_DIR="build"
 ARTIFACTS_DIR="artifacts"
@@ -191,8 +171,8 @@ if [[ "$ARCH" != "x86_64" && "$ARCH" != "aarch64" ]]; then
     error "Unsupported architecture: $ARCH\n  Supported: x86_64, aarch64"
 fi
 
-# Create artifacts directory
-mkdir -p "$ARTIFACTS_DIR"
+# Create directories
+mkdir -p "$ARTIFACTS_DIR" "$BUILD_DIR"
 
 # Determine kernel version
 if [ -n "$KERNEL_VERSION_ARG" ]; then
@@ -229,40 +209,7 @@ if [ -f "${KERNEL_PATH}.xz" ]; then
     exit 0
 fi
 
-# Try to download from GitHub releases (unless --force-build)
-if [ "$FORCE_BUILD" = false ]; then
-    info "Attempting to download kernel from GitHub releases..."
-
-    DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/download/v${KERNEL_VERSION}/${KERNEL_FILENAME}.xz"
-    CHECKSUM_URL="https://github.com/${GITHUB_REPO}/releases/download/v${KERNEL_VERSION}/${KERNEL_FILENAME}.sha256"
-
-    # Try to download compressed kernel and checksum
-    if curl -L -f -o "${KERNEL_PATH}.xz" "$DOWNLOAD_URL" 2>/dev/null && \
-       curl -L -f -o "${KERNEL_PATH}.sha256" "$CHECKSUM_URL" 2>/dev/null; then
-
-        info "Downloaded kernel from GitHub releases"
-        info "Decompressing kernel..."
-        xz -d "${KERNEL_PATH}.xz"
-
-        info "Verifying checksum..."
-        if (cd "$ARTIFACTS_DIR" && sha256sum -c "${KERNEL_FILENAME}.sha256" 2>/dev/null); then
-            info "Checksum verification passed"
-            info "Kernel ready: $KERNEL_PATH"
-            exit 0
-        else
-            warn "Checksum verification failed, will build from source"
-            rm -f "$KERNEL_PATH" "${KERNEL_PATH}.sha256"
-        fi
-    else
-        info "Download failed or release not found, will build from source"
-    fi
-fi
-
-if [ "$FORCE_BUILD" = true ]; then
-    info "Building kernel from source (--force-build specified)"
-else
-    info "Building kernel from source for architecture: $ARCH"
-fi
+info "Building kernel from source for architecture: $ARCH"
 
 # Check for required build tools
 info "Checking for required build tools..."
@@ -280,9 +227,6 @@ if [ "$ARCH" = "aarch64" ]; then
     fi
 fi
 
-# Create build directory
-mkdir -p "$BUILD_DIR"
-
 # Extract major version for download URL
 MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f1)
 
@@ -290,6 +234,15 @@ MAJOR_VERSION=$(echo "$KERNEL_VERSION" | cut -d. -f1)
 KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v${MAJOR_VERSION}.x/linux-${KERNEL_VERSION}.tar.xz"
 KERNEL_TARBALL="$BUILD_DIR/linux-${KERNEL_VERSION}.tar.xz"
 KERNEL_SRC_DIR="$BUILD_DIR/linux-${KERNEL_VERSION}"
+
+# Delete cached source when verification is enabled (security: always use fresh sources)
+if [ "$VERIFICATION_LEVEL" != "disabled" ]; then
+    if [ -f "$KERNEL_TARBALL" ] || [ -d "$KERNEL_SRC_DIR" ]; then
+        info "Deleting cached source (verification enabled - using fresh sources)"
+        rm -f "$KERNEL_TARBALL"
+        rm -rf "$KERNEL_SRC_DIR"
+    fi
+fi
 
 # Download kernel source if not already present
 if [ ! -f "$KERNEL_TARBALL" ]; then
@@ -434,9 +387,9 @@ cp "$KERNEL_BINARY" "$ARTIFACTS_DIR/$OUTPUT_NAME" || error "Failed to copy kerne
 info "Generating SHA256 checksum of decompressed kernel..."
 (cd "$ARTIFACTS_DIR" && sha256sum "$OUTPUT_NAME" > "${OUTPUT_NAME}.sha256")
 
-# Compress kernel with xz
+# Compress kernel with xz (keep decompressed copy for signing)
 info "Compressing kernel with xz (this may take a while)..."
-xz -9 -T0 "$ARTIFACTS_DIR/$OUTPUT_NAME" || error "Failed to compress kernel"
+xz -9 -k -T0 "$ARTIFACTS_DIR/$OUTPUT_NAME" || error "Failed to compress kernel"
 info "Kernel compressed successfully"
 
 # Copy kernel config

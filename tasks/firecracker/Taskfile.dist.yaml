@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+vars:
+  KERNEL_VERSION: ""
+  FIRECRACKER_VERSION: ""
+
+tasks:
+  test-kernel:
+    desc: Test kernel by booting in Firecracker VM
+    silent: true
+    summary: |
+      Test Firecracker-compatible kernel by booting it in a VM
+
+      Options:
+        KERNEL_VERSION=6.1        Kernel version to test (default: latest stable)
+        FIRECRACKER_VERSION=v1.10 Firecracker version to use (default: latest)
+        FORCE_BUILD=true          Force building kernel from source
+        VERIFICATION_LEVEL=high   Set verification level (default: high)
+                                    high     - PGP + SHA256 (strongest)
+                                    medium   - SHA256 only (no GPG needed)
+                                    disabled - No verification (emergency only)
+
+      Examples:
+        task firecracker:test-kernel                                # Test latest kernel
+        task firecracker:test-kernel KERNEL_VERSION=6.1             # Test kernel 6.1
+        task firecracker:test-kernel FORCE_BUILD=true               # Force rebuild and test
+        task firecracker:test-kernel KERNEL_VERSION=6.10 FIRECRACKER_VERSION=v1.10.0
+        task firecracker:test-kernel VERIFICATION_LEVEL=medium      # Skip PGP verification
+        task firecracker:test-kernel VERIFICATION_LEVEL=disabled    # Skip all verification
+
+      Requirements:
+        - KVM support (/dev/kvm must be accessible)
+        - sudo access (for rootfs creation)
+    cmds:
+      - |
+        OPTS=""
+        {{if .KERNEL_VERSION}}OPTS="$OPTS --kernel {{.KERNEL_VERSION}}"{{end}}
+        {{if .FIRECRACKER_VERSION}}OPTS="$OPTS --firecracker {{.FIRECRACKER_VERSION}}"{{end}}
+        {{if .FORCE_BUILD}}OPTS="$OPTS --force-build"{{end}}
+        {{if .VERIFICATION_LEVEL}}OPTS="$OPTS --verification-level {{.VERIFICATION_LEVEL}}"{{end}}
+        ./scripts/firecracker/test-kernel.sh $OPTS
+
+  create-rootfs:
+    desc: Create test rootfs for Firecracker boot testing
+    silent: true
+    interactive: true
+    summary: |
+      Create a minimal test rootfs that boots and shuts down cleanly
+
+      Options:
+        OUTPUT=custom-rootfs.ext4  Output file path (default: artifacts/test-rootfs.ext4)
+        SIZE=50                    Size in MB (default: 50)
+
+      Examples:
+        task firecracker:create-rootfs                         # Create default rootfs
+        task firecracker:create-rootfs OUTPUT=test.ext4        # Custom output path
+        task firecracker:create-rootfs SIZE=100                # Larger rootfs
+    cmds:
+      - |
+        {{if .OUTPUT}}
+          ./scripts/firecracker/create-test-rootfs.sh {{.OUTPUT}}
+        {{else}}
+          ./scripts/firecracker/create-test-rootfs.sh
+        {{end}}

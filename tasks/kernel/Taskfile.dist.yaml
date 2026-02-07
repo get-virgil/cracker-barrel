@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+vars:
+  DETECTED_ARCH:
+    sh: uname -m | sed 's/arm64/aarch64/'
+  ARCH: '{{.ARCH | default .DETECTED_ARCH}}'
+  KERNEL_VERSION: ""
+  FIRECRACKER_VERSION: ""
+
+tasks:
+  get:
+    desc: "Get kernel (smart: download or build)"
+    silent: true
+    summary: |
+      Get Firecracker-compatible kernel (tries download first, builds if unavailable)
+
+      Options:
+        KERNEL_VERSION=6.1        Specific kernel version (default: latest stable)
+        ARCH=aarch64              Target architecture (default: auto-detect)
+        VERIFICATION_LEVEL=high   Set verification level for building (default: high)
+                                    high     - PGP + SHA256 (strongest)
+                                    medium   - SHA256 only (no GPG needed)
+                                    disabled - No verification (emergency only)
+
+      Examples:
+        task kernel:get                                 # Get latest kernel
+        task kernel:get KERNEL_VERSION=6.1              # Get kernel 6.1
+        task kernel:get KERNEL_VERSION=6.1 ARCH=aarch64 # Get ARM64 kernel
+        task kernel:get VERIFICATION_LEVEL=medium       # Build with medium verification if needed
+    cmds:
+      - |
+        OPTS="--arch {{.ARCH}}"
+        {{if .KERNEL_VERSION}}OPTS="$OPTS --kernel {{.KERNEL_VERSION}}"{{end}}
+
+        # Try download first, build if download fails
+        if ! ./scripts/kernel/download-kernel.sh $OPTS 2>/dev/null; then
+          echo "[INFO] Download not available, building from source..."
+          {{if .VERIFICATION_LEVEL}}OPTS="$OPTS --verification-level {{.VERIFICATION_LEVEL}}"{{end}}
+          ./scripts/kernel/build-kernel.sh $OPTS
+        fi
+
+  download:
+    desc: Download pre-built kernel from GitHub releases
+    silent: true
+    summary: |
+      Download pre-built Firecracker-compatible kernel from GitHub releases
+
+      Options:
+        KERNEL_VERSION=6.1        Specific kernel version (default: latest stable)
+        ARCH=aarch64              Target architecture (default: auto-detect)
+
+      Examples:
+        task kernel:download                                 # Download latest kernel
+        task kernel:download KERNEL_VERSION=6.1              # Download kernel 6.1
+        task kernel:download KERNEL_VERSION=6.1 ARCH=aarch64 # Download ARM64 kernel
+    cmds:
+      - |
+        OPTS="--arch {{.ARCH}}"
+        {{if .KERNEL_VERSION}}OPTS="$OPTS --kernel {{.KERNEL_VERSION}}"{{end}}
+        ./scripts/kernel/download-kernel.sh $OPTS
+
+  build:
+    desc: Build kernel from source
+    silent: true
+    summary: |
+      Build Firecracker-compatible kernel from source
+
+      Options:
+        KERNEL_VERSION=6.1        Specific kernel version (default: latest stable)
+        ARCH=aarch64              Target architecture (default: auto-detect)
+        VERIFICATION_LEVEL=high   Set verification level (default: high)
+                                    high     - PGP + SHA256 (strongest)
+                                    medium   - SHA256 only (no GPG needed)
+                                    disabled - No verification (emergency only)
+
+      Examples:
+        task kernel:build                                 # Build latest kernel
+        task kernel:build KERNEL_VERSION=6.1              # Build kernel 6.1
+        task kernel:build KERNEL_VERSION=6.1 ARCH=aarch64 # Build ARM64 kernel
+        task kernel:build VERIFICATION_LEVEL=medium       # Skip PGP verification
+        task kernel:build VERIFICATION_LEVEL=disabled     # Skip all verification
+    cmds:
+      - |
+        OPTS="--arch {{.ARCH}}"
+        {{if .KERNEL_VERSION}}OPTS="$OPTS --kernel {{.KERNEL_VERSION}}"{{end}}
+        {{if .VERIFICATION_LEVEL}}OPTS="$OPTS --verification-level {{.VERIFICATION_LEVEL}}"{{end}}
+        ./scripts/kernel/build-kernel.sh $OPTS

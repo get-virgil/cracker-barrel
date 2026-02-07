@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+tasks:
+  all:
+    desc: Remove all build artifacts, caches, and downloads
+    silent: true
+    summary: |
+      Remove all cached builds and downloaded artifacts
+
+      This will:
+        - Remove build/ directory (kernel source and build artifacts)
+        - Remove artifacts/ directory (built kernels, checksums, test rootfs)
+        - Remove bin/ directory (Firecracker binaries and test scripts)
+        - Free up ~10GB+ of disk space
+
+      Next run of get-kernel will download or rebuild from scratch
+    cmds:
+      - echo "Cleaning all build artifacts and caches..."
+      - rm -rf build/ artifacts/ bin/
+      - echo "Clean complete! Freed up disk space."
+
+  kernel:
+    desc: Remove only kernel artifacts (keep Firecracker and rootfs)
+    silent: true
+    summary: |
+      Remove kernel artifacts but keep Firecracker binaries and test rootfs
+
+      Options:
+        VERSION=6.1  Remove specific kernel version only
+    cmds:
+      - |
+        {{if .VERSION}}
+          echo "Removing kernel {{.VERSION}} artifacts..."
+          rm -f artifacts/vmlinux-{{.VERSION}}-* artifacts/Image-{{.VERSION}}-* artifacts/config-{{.VERSION}}-*
+        {{else}}
+          echo "Removing all kernel artifacts..."
+          rm -f artifacts/vmlinux-* artifacts/Image-* artifacts/config-* artifacts/*.sha256
+        {{end}}
+      - echo "Kernel artifacts removed."
+
+  firecracker:
+    desc: Remove cached Firecracker binaries
+    silent: true
+    cmds:
+      - echo "Removing Firecracker binaries..."
+      - rm -rf bin/firecracker-*
+      - echo "Firecracker binaries removed."
+
+  rootfs:
+    desc: Remove test rootfs (will be recreated on next test)
+    silent: true
+    cmds:
+      - echo "Removing test rootfs..."
+      - rm -f artifacts/test-rootfs.ext4 artifacts/*.ext4
+      - echo "Test rootfs removed."
+
+  signatures:
+    desc: Remove checksums and signatures (will be regenerated on next signing)
+    silent: true
+    summary: |
+      Remove checksum and signature files
+
+      This removes:
+        - SHA256SUMS (combined checksums file)
+        - SHA256SUMS.asc (PGP signature)
+        - Individual .sha256 files
+
+      Use this when you need to regenerate signatures after building additional kernels.
+
+      Example:
+        task kernel:build ARCH=x86_64
+        task kernel:build ARCH=aarch64
+        task clean:signatures
+        task signing:sign-artifacts  # Includes both architectures
+    cmds:
+      - echo "Removing checksums and signatures..."
+      - rm -f artifacts/SHA256SUMS artifacts/SHA256SUMS.asc artifacts/*.sha256
+      - rm -f release-artifacts/SHA256SUMS release-artifacts/SHA256SUMS.asc release-artifacts/*.sha256 2>/dev/null || true
+      - echo "Checksums and signatures removed."

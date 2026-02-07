@@ -1,0 +1,165 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+vars:
+  SIGNING_KEY_NAME: '{{.SIGNING_KEY_NAME | default "Cracker Barrel Release Signing"}}'
+  SIGNING_KEY_EMAIL: '{{.SIGNING_KEY_EMAIL | default "me@kazatron.com"}}'
+  SIGNING_KEY_EXPIRY: '{{.SIGNING_KEY_EXPIRY | default "1y"}}'
+
+tasks:
+  list:
+    desc: Show all signing keys in local keyring
+    silent: true
+    summary: |
+      List all PGP keys in the local .gnupg/ keyring
+
+      Shows key ID, creation date, and email for all keys.
+    cmds:
+      - |
+        if [ ! -d ".gnupg" ]; then
+          echo "No local keyring found (.gnupg/ does not exist)"
+          echo "Run 'task signing:generate-signing-key' to create a signing key"
+          exit 0
+        fi
+
+        echo "=== Local Signing Keys ==="
+        echo ""
+        gpg --homedir .gnupg --list-keys
+
+  generate-signing-key:
+    desc: Generate PGP signing key for kernel releases (first-time setup)
+    silent: true
+    interactive: true
+    summary: |
+      Generate a new PGP key for signing kernel release artifacts (first-time setup)
+
+      This creates:
+        - Private key stored locally in .gnupg/ (gitignored)
+        - Public key exported to keys/cracker-barrel-release.asc (committed)
+        - Private key exported to keys/cracker-barrel-release-private.asc (gitignored)
+        - Optionally adds SIGNING_KEY to GitHub Actions secrets
+
+      Options:
+        SIGNING_KEY_NAME="Your Name"       Key owner name (default: "Cracker Barrel Release Signing")
+        SIGNING_KEY_EMAIL="you@example"    Key email (default: "me@kazatron.com")
+        SIGNING_KEY_EXPIRY="1y"            Key expiration (default: "1y")
+                                             Format: 0=never, <n>=days, <n>w=weeks, <n>m=months, <n>y=years
+
+      Examples:
+        task signing:generate-signing-key
+        task signing:generate-signing-key SIGNING_KEY_NAME="MyProject Release" SIGNING_KEY_EMAIL="release@myproject.dev"
+        task signing:generate-signing-key SIGNING_KEY_EXPIRY="2y"     # Expires in 2 years
+        task signing:generate-signing-key SIGNING_KEY_EXPIRY="0"      # Never expires
+
+      For key rotation, use 'task signing:rotate' instead.
+    env:
+      SIGNING_KEY_NAME: '{{.SIGNING_KEY_NAME}}'
+      SIGNING_KEY_EMAIL: '{{.SIGNING_KEY_EMAIL}}'
+      SIGNING_KEY_EXPIRY: '{{.SIGNING_KEY_EXPIRY}}'
+    cmds:
+      - ./scripts/signing/generate-signing-key.sh
+
+  rotate:
+    desc: Rotate signing key (generates new key and updates GitHub)
+    silent: true
+    interactive: true
+    summary: |
+      Rotate the signing key by generating a new key
+
+      This will:
+        1. Create timestamped backup of current keys
+        2. Generate new signing key
+        3. Display new key fingerprint for README update
+        4. Optionally update GitHub Actions SIGNING_KEY secret (if gh CLI available)
+
+      Options:
+        SIGNING_KEY_NAME="Your Name"       Key owner name (default: "Cracker Barrel Release Signing")
+        SIGNING_KEY_EMAIL="you@example"    Key email (default: "me@kazatron.com")
+        SIGNING_KEY_EXPIRY="1y"            Key expiration (default: "1y")
+                                             Format: 0=never, <n>=days, <n>w=weeks, <n>m=months, <n>y=years
+
+      Old key remains in keyring for verifying old releases.
+      Works locally without GitHub - GitHub integration is optional.
+    env:
+      SIGNING_KEY_NAME: '{{.SIGNING_KEY_NAME}}'
+      SIGNING_KEY_EMAIL: '{{.SIGNING_KEY_EMAIL}}'
+      SIGNING_KEY_EXPIRY: '{{.SIGNING_KEY_EXPIRY}}'
+    cmds:
+      - ./scripts/signing/rotate-signing-key.sh
+
+  sign-artifacts:
+    desc: Sign artifacts with PGP key
+    silent: true
+    summary: |
+      Sign SHA256SUMS file in artifacts/ or release-artifacts/ directory
+
+      For local testing: Signs artifacts in artifacts/
+      For CI: Signs artifacts in release-artifacts/ (after consolidation)
+
+      Creates SHA256SUMS.asc (detached PGP signature)
+
+      Requirements:
+        - Signing key available (local: .gnupg/, CI: SIGNING_KEY env var)
+        - SHA256SUMS file exists in target directory
+    cmds:
+      - ./scripts/signing/sign-artifacts.sh
+
+  verify-artifacts:
+    desc: Verify PGP signatures on build artifacts
+    silent: true
+    summary: |
+      Verify the PGP signature on SHA256SUMS.asc
+
+      This tests the complete verification workflow:
+        1. Import public key
+        2. Verify PGP signature on SHA256SUMS
+        3. Verify kernel checksums
+
+      Works with both artifacts/ and release-artifacts/ directories.
+    cmds:
+      - ./scripts/signing/verify-artifacts.sh
+
+  expiry-warning:
+    desc: Check if signing key expires soon (exits non-zero if ≤60 days)
+    silent: true
+    summary: |
+      Check if the current signing key will expire within 60 days
+
+      Exit codes:
+        0 - Key is valid for >60 days or never expires
+        1 - Key expires in ≤60 days or has already expired
+        2 - No key found or error checking expiration
+
+      This is useful for CI/CD pipelines to catch expiring keys early.
+      Run this task regularly (e.g., daily) to get advance warning.
+
+      Example:
+        task signing:expiry-warning  # Exit 0 if OK, exit 1 if expiring soon
+    cmds:
+      - ./scripts/signing/check-key-expiry.sh
+
+  remove-signing-key:
+    desc: Remove local signing key and keyring (destructive operation)
+    silent: true
+    interactive: true
+    summary: |
+      Remove local PGP signing key and keyring
+
+      This removes:
+        - .gnupg/ directory (local GPG keyring)
+        - keys/cracker-barrel-release-private.asc (private key export)
+        - keys/cracker-barrel-release.asc (public key export)
+        - Optionally: SIGNING_KEY from GitHub Actions (with double confirmation)
+
+      This does NOT remove:
+        - keys/backups/ directory (all key backups are preserved for safety)
+        - keys/README.md (documentation)
+
+      WARNING: This is destructive and cannot be undone.
+
+      If gh CLI is available and SIGNING_KEY exists in GitHub Actions,
+      you will be prompted (with double confirmation) to remove it.
+
+      Use case: Key rotation, security incident response, or cleanup
+    cmds:
+      - ./scripts/signing/remove-signing-key.sh

@@ -69,26 +69,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install Task
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            libncurses-dev \
-            bison \
-            flex \
-            libssl-dev \
-            libelf-dev \
-            bc \
-            wget \
-            xz-utils \
-            jq \
-            gnupg
+          sh -c "$(curl -fsSL https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
 
-          # Install cross-compilation tools for aarch64
-          if [ "${{ matrix.arch }}" = "aarch64" ]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-          fi
+      - name: Install build dependencies
+        run: task dev:install-deps
+
+      - name: Install cross-compilation tools
+        run: task dev:ensure-cross-tools ARCH=${{ matrix.arch }}
 
       - name: Cache kernel source
         uses: actions/cache@v4
@@ -97,12 +86,7 @@ jobs:
           key: kernel-source-${{ needs.check-version.outputs.kernel_version }}
 
       - name: Build kernel
-        run: |
-          # Uses default 'high' verification level:
-          # - Verifies PGP signature on sha256sums.asc from kernel.org autosigner
-          # - Verifies SHA256 checksum of kernel tarball
-          # - Fails if verification unavailable (fail-secure)
-          ./get-kernel.sh --kernel ${{ needs.check-version.outputs.kernel_version }} --arch ${{ matrix.arch }} --force-build
+        run: task kernel:build KERNEL_VERSION=${{ needs.check-version.outputs.kernel_version }} ARCH=${{ matrix.arch }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -121,27 +105,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Task
+        run: |
+          sh -c "$(curl -fsSL https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: all-artifacts
 
-      - name: Prepare release artifacts
-        run: |
-          mkdir -p release-artifacts
+      - name: Consolidate artifacts
+        run: task release:consolidate-artifacts
 
-          # Move all artifacts to release-artifacts directory
-          find all-artifacts -type f -exec mv {} release-artifacts/ \;
-
-          # Generate combined SHA256SUMS file
-          cd release-artifacts
-
-          # Combine all individual .sha256 files into SHA256SUMS
-          cat *.sha256 > SHA256SUMS
-          rm *.sha256
-
-          echo "Release artifacts:"
-          ls -lh
+      - name: Sign release artifacts
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: task signing:sign-artifacts
 
       - name: Create release notes
         run: |
@@ -165,13 +144,15 @@ jobs:
           - \`config-${KERNEL_VERSION}-x86_64\` - Kernel configuration for x86_64
           - \`config-${KERNEL_VERSION}-aarch64\` - Kernel configuration for aarch64
           - \`SHA256SUMS\` - Checksums of decompressed kernels
+          - \`SHA256SUMS.asc\` - PGP signature of SHA256SUMS
 
           ## Usage
 
           1. Download the appropriate kernel for your architecture
-          2. Decompress: \`xz -d vmlinux-${KERNEL_VERSION}-x86_64.xz\`
-          3. Verify checksum: \`sha256sum -c SHA256SUMS\`
-          4. Use with Firecracker
+          2. Verify PGP signature (see Verification section below)
+          3. Verify checksum: \`sha256sum -c SHA256SUMS --ignore-missing\`
+          4. Decompress: \`xz -d vmlinux-${KERNEL_VERSION}-x86_64.xz\`
+          5. Use with Firecracker
 
           ## Kernel Configuration
 
@@ -190,19 +171,42 @@ jobs:
 
           ## Verification
 
-          To verify the integrity of the downloaded kernel:
+          ### PGP Signature Verification (Recommended)
+
+          Verify the PGP signature on SHA256SUMS to ensure kernels haven't been tampered with:
 
           \`\`\`bash
-          # Download and decompress
+          # Import Cracker Barrel release signing key (see README for fingerprint)
+          curl -s https://raw.githubusercontent.com/${{ github.repository }}/master/keys/cracker-barrel-release.asc | gpg --import
+
+          # Download checksums and signature
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/SHA256SUMS
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/SHA256SUMS.asc
+
+          # Verify PGP signature
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+
+          # If signature is good, verify kernel checksums
           wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/vmlinux-${KERNEL_VERSION}-x86_64.xz
           xz -d vmlinux-${KERNEL_VERSION}-x86_64.xz
-
-          # Download checksums
-          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/SHA256SUMS
-
-          # Verify
           sha256sum -c SHA256SUMS --ignore-missing
           \`\`\`
+
+          ### Quick Verification (Checksums Only)
+
+          If you trust GitHub's infrastructure and don't need PGP verification:
+
+          \`\`\`bash
+          # Download kernel and checksums
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/vmlinux-${KERNEL_VERSION}-x86_64.xz
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/SHA256SUMS
+
+          # Decompress and verify
+          xz -d vmlinux-${KERNEL_VERSION}-x86_64.xz
+          sha256sum -c SHA256SUMS --ignore-missing
+          \`\`\`
+
+          See the [main README](https://github.com/${{ github.repository }}#verifying-releases) for complete verification instructions including key fingerprint.
 
           ---
 

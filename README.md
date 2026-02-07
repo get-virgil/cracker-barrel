@@ -8,10 +8,11 @@ Automated builder for Firecracker-compatible Linux kernels. This project builds 
 - **Multi-Architecture Support**: Builds for both x86_64 and aarch64 (ARM64)
 - **Firecracker-Optimized**: Uses official Firecracker kernel configurations for minimal, fast-booting kernels
 - **GitHub Releases**: Automatically publishes built kernels as GitHub releases with checksums
-- **Smart Caching**: `get-kernel.sh` tries to download pre-built kernels first, only building if necessary
+- **Separate Download & Build**: `download-kernel.sh` downloads pre-built kernels, `build-kernel.sh` builds from source
 - **Cryptographic Verification**: PGP signature + SHA256 checksum verification of all kernel sources
 - **Secure by Default**: Builds fail if verification unavailable - no unverified builds ever released
 - **Configurable Security**: Three verification levels (high/medium/disabled) for different use cases
+- **Local-First Workflow**: Task-based build system - CI runs the same commands you run locally
 - **Idempotent**: Skips builds if a release already exists for the current kernel version
 
 ## Quick Start
@@ -25,6 +26,66 @@ Visit the [Releases](../../releases) page to download pre-built kernels. Each re
 - `config-{version}-x86_64` - x86_64 kernel configuration
 - `config-{version}-aarch64` - aarch64 kernel configuration
 - `SHA256SUMS` - Checksums of decompressed kernels
+- `SHA256SUMS.asc` - PGP signature of SHA256SUMS
+
+### Verifying Releases
+
+**All kernel releases are PGP-signed.** We strongly recommend verifying signatures before use:
+
+```bash
+# 1. Import Cracker Barrel release signing key (first time only)
+curl -s https://raw.githubusercontent.com/get-virgil/cracker-barrel/master/keys/cracker-barrel-release.asc | gpg --import
+
+# Verify the key fingerprint matches (see below)
+gpg --fingerprint releases@cracker-barrel.dev
+
+# 2. Download kernel, checksums, and signature
+wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/vmlinux-VERSION-x86_64.xz
+wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/SHA256SUMS
+wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/SHA256SUMS.asc
+
+# 3. Verify PGP signature on checksums
+gpg --verify SHA256SUMS.asc SHA256SUMS
+# Should show: "Good signature from Cracker Barrel Release Signing"
+
+# 4. Decompress kernel
+xz -d vmlinux-VERSION-x86_64.xz
+
+# 5. Verify kernel checksum
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+**Cracker Barrel Release Signing Key:**
+```
+Key ID: [TO BE ADDED - Run 'task signing:generate-signing-key']
+Fingerprint: [TO BE ADDED - Run 'task signing:generate-signing-key']
+Email: releases@cracker-barrel.dev
+```
+
+**Chain of Trust:**
+1. Kernel sources verified with kernel.org autosigner PGP signature
+2. Kernel sources verified with SHA256 checksums from kernel.org
+3. Built kernels signed with Cracker Barrel release key
+4. Users verify with Cracker Barrel public key
+
+This ensures:
+- ✅ Sources came from kernel.org (not tampered)
+- ✅ Builds came from Cracker Barrel CI (not modified)
+- ✅ Downloads weren't corrupted or replaced
+
+### Quick Start Without Verification
+
+If you trust GitHub's infrastructure and don't need PGP verification:
+
+```bash
+# Download kernel and checksums
+wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/vmlinux-VERSION-x86_64.xz
+wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/SHA256SUMS
+
+# Decompress and verify checksum
+xz -d vmlinux-VERSION-x86_64.xz
+sha256sum -c SHA256SUMS --ignore-missing
+```
 
 ### Using with Firecracker
 
@@ -51,13 +112,13 @@ If you have [Task](https://taskfile.dev) installed:
 
 ```bash
 # Install dependencies
-task install-deps
+task dev:install-deps
 
 # Get latest kernel (download or build)
-task get-kernel
+task kernel:get
 
 # Test kernel in Firecracker VM
-task test-kernel
+task firecracker:test-kernel
 
 # Clean all artifacts
 task clean
@@ -68,99 +129,153 @@ task --list
 
 ### Prerequisites
 
-Install build dependencies:
+**1. Install Task (task runner):**
+
+Task is required for both local development and CI. Install it using the official script:
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get install -y \
-  build-essential \
-  libncurses-dev \
-  bison \
-  flex \
-  libssl-dev \
-  libelf-dev \
-  bc \
-  wget \
-  xz-utils \
-  jq \
-  gnupg
-
-# For aarch64 cross-compilation
-sudo apt-get install -y gcc-aarch64-linux-gnu
+sh -c "$(curl -fsSL https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
 ```
+
+Add `~/.local/bin` to your PATH if needed.
+
+**2. Install build dependencies:**
+
+```bash
+# Ubuntu/Debian - Using task runner (recommended)
+task dev:install-deps
+
+# Arch Linux (for the best developers)
+task dev:i-use-arch-btw
+
+# For cross-compilation (optional)
+task dev:install-arm-tools   # ARM64 on x86_64 host
+task dev:install-x86-tools   # x86_64 on ARM64 host
+```
+
+**Package list:** See `task --summary dev:install-deps` or `task --summary dev:i-use-arch-btw` for the complete list.
 
 **Note:** `gnupg` is required for PGP signature verification (default `high` security level). If you cannot install GPG, use `--verification-level medium` to skip PGP verification.
 
-### Get Kernel Script
+### Kernel Scripts
 
-The `get-kernel.sh` script tries to download pre-built kernels from GitHub releases, falling back to building from source if needed:
+The project provides two separate scripts for different workflows:
+
+#### Download Pre-Built Kernels
+
+The `download-kernel.sh` script downloads pre-built kernels from GitHub releases:
 
 ```bash
-# Get latest stable kernel (download or build)
-./get-kernel.sh
+# Download latest stable kernel
+./scripts/kernel/download-kernel.sh
 
-# Get specific kernel version
-./get-kernel.sh --kernel 6.1
+# Download specific kernel version
+./scripts/kernel/download-kernel.sh --kernel 6.1
 
-# Force building from source (skip download)
-./get-kernel.sh --kernel 6.1 --force-build
-
-# Get for specific architecture
-./get-kernel.sh --kernel 6.1 --arch aarch64
-
-# Medium verification (SHA256 only, no PGP)
-./get-kernel.sh --kernel 6.1 --verification-level medium
-
-# Disabled verification (emergency only)
-./get-kernel.sh --kernel 6.1 --verification-level disabled
-
-# Legacy positional syntax (still supported, always builds)
-./get-kernel.sh x86_64          # Build latest for x86_64
-./get-kernel.sh x86_64 6.1      # Build specific version
-./get-kernel.sh aarch64 6.1     # Build for aarch64
+# Download for specific architecture
+./scripts/kernel/download-kernel.sh --kernel 6.1 --arch aarch64
 ```
 
 The script will:
-1. Use provided kernel version, or fetch the latest stable from kernel.org
+1. Fetch the latest stable version from kernel.org (or use provided version)
 2. Check if kernel already exists locally (skip if present)
-3. Try to download pre-built kernel from GitHub releases (unless `--force-build`)
-4. Verify checksum after download
-5. Fall back to building from source if:
-   - Download fails or release doesn't exist
-   - Checksum verification fails
-   - `--force-build` flag is used
-6. When building from source:
-   - Download kernel source (or use cached tarball)
-   - **Verify source based on `--verification-level`:**
-     - `high` (default): PGP signature + SHA256 checksum
-     - `medium`: SHA256 checksum only
-     - `disabled`: Skip all verification
-   - Extract kernel source only after verification passes
-   - Apply Firecracker-compatible configuration
-   - Build the kernel
-   - Compress with xz
-   - Generate SHA256 checksums
-7. Place artifacts in `artifacts/` directory
+3. Download compressed kernel from GitHub releases
+4. Verify checksum of downloaded kernel
+5. Decompress kernel
+6. **Fails if release not available** (no build fallback)
+
+#### Build from Source
+
+The `build-kernel.sh` script builds kernels from source:
+
+```bash
+# Build latest stable kernel
+./scripts/kernel/build-kernel.sh
+
+# Build specific kernel version
+./scripts/kernel/build-kernel.sh --kernel 6.1
+
+# Build for specific architecture
+./scripts/kernel/build-kernel.sh --kernel 6.1 --arch aarch64
+
+# Medium verification (SHA256 only, no PGP)
+./scripts/kernel/build-kernel.sh --kernel 6.1 --verification-level medium
+
+# Disabled verification (emergency only)
+./scripts/kernel/build-kernel.sh --kernel 6.1 --verification-level disabled
+```
+
+The script will:
+1. Fetch the latest stable version from kernel.org (or use provided version)
+2. Check if kernel already built locally (skip if present)
+3. **Delete cached sources when verification enabled** (security: fresh sources)
+   - `high` or `medium`: Deletes `build/linux-*.tar.xz` and `build/linux-*/`
+   - `disabled`: Keeps cache (allows source modifications for development)
+4. Download kernel source tarball
+5. **Verify source based on `--verification-level`:**
+   - `high` (default): PGP signature + SHA256 checksum
+   - `medium`: SHA256 checksum only
+   - `disabled`: Skip all verification
+6. Extract kernel source only after verification passes
+7. Apply Firecracker-compatible configuration
+8. Build the kernel
+9. Compress with xz
+10. Generate SHA256 checksums
+11. Place artifacts in `artifacts/` directory
+
+**Development workflow with source modifications:**
+```bash
+# Build with disabled verification (keeps sources)
+./scripts/kernel/build-kernel.sh --kernel 6.1 --verification-level disabled
+
+# Modify source code
+vim build/linux-6.1/drivers/virtio/virtio_ring.c
+
+# Rebuild with your modifications
+./scripts/kernel/build-kernel.sh --kernel 6.1 --verification-level disabled
+```
 
 ### Using Task (Recommended)
 
-[Task](https://taskfile.dev) is a task runner that provides convenient shortcuts:
+[Task](https://taskfile.dev) is a task runner that provides convenient shortcuts.
+
+**Tasks are organized into namespaces:**
+- `kernel:*` - Kernel operations (get, download, build)
+- `firecracker:*` - Testing kernels with Firecracker
+- `clean:*` - Cleaning artifacts
+- `signing:*` - PGP key management and signing
+- `release:*` - CI release artifact management
+- `dev:*` - Development utilities
+
+**Kernel task workflow:**
+- `kernel:get` - Smart: tries download, builds if unavailable (recommended)
+- `kernel:download` - Download only: fails if pre-built not available
+- `kernel:build` - Build from source: always uses fresh sources when verifying
 
 ```bash
-# Get kernel (equivalent to ./get-kernel.sh)
-task get-kernel
+# Get kernel (smart: download or build)
+task kernel:get
 
 # Get specific version
-task get-kernel KERNEL_VERSION=6.1
+task kernel:get KERNEL_VERSION=6.1
 
-# Force build from source
-task get-kernel FORCE_BUILD=true
+# Download only (fails if not available)
+task kernel:download
 
-# Build for different architecture
-task get-kernel KERNEL_VERSION=6.1 ARCH=aarch64
+# Download specific version
+task kernel:download KERNEL_VERSION=6.1
+
+# Build from source (deletes cache unless verification=disabled)
+task kernel:build
+
+# Build specific version for ARM64
+task kernel:build KERNEL_VERSION=6.1 ARCH=aarch64
+
+# Build with disabled verification (allows source modifications for development)
+task kernel:build VERIFICATION_LEVEL=disabled
 
 # Test kernel
-task test-kernel
+task firecracker:test-kernel
 
 # List all tasks
 task --list
@@ -196,8 +311,8 @@ Choose your security posture with `--verification-level`:
 
 **`high` (Default - Strongest Security):**
 ```bash
-./get-kernel.sh                    # Default: high verification
-task get-kernel                    # Default: high verification
+./scripts/kernel/build-kernel.sh                    # Default: high verification
+task kernel:build              # Default: high verification
 ```
 - ✅ Verifies PGP signature on `sha256sums.asc`
 - ✅ Verifies SHA256 checksum of kernel tarball
@@ -207,8 +322,8 @@ task get-kernel                    # Default: high verification
 
 **`medium` (SHA256 Only):**
 ```bash
-./get-kernel.sh --verification-level medium
-task get-kernel VERIFICATION_LEVEL=medium
+./scripts/kernel/build-kernel.sh --verification-level medium
+task kernel:get VERIFICATION_LEVEL=medium
 ```
 - ⚠️ Skips PGP signature verification
 - ✅ Verifies SHA256 checksum only
@@ -219,8 +334,8 @@ task get-kernel VERIFICATION_LEVEL=medium
 
 **`disabled` (No Verification - Emergency Only):**
 ```bash
-./get-kernel.sh --verification-level disabled
-task get-kernel VERIFICATION_LEVEL=disabled
+./scripts/kernel/build-kernel.sh --verification-level disabled
+task kernel:get VERIFICATION_LEVEL=disabled
 ```
 - ❌ No verification whatsoever
 - **Protects against:** Nothing
@@ -304,13 +419,13 @@ Test kernels locally using the `test-kernel.sh` script:
 
 ```bash
 # Test latest stable kernel with latest Firecracker
-./test-kernel.sh
+./scripts/firecracker/test-kernel.sh
 
 # Test specific kernel version
-./test-kernel.sh --kernel 6.1
+./scripts/firecracker/test-kernel.sh --kernel 6.1
 
 # Test with specific Firecracker version
-./test-kernel.sh --kernel 6.10 --firecracker v1.10.0
+./scripts/firecracker/test-kernel.sh --kernel 6.10 --firecracker v1.10.0
 ```
 
 The test script will:
@@ -329,17 +444,37 @@ GitHub Actions runners do not have KVM/nested virtualization support, so Firecra
 
 ## GitHub Actions Workflow
 
-The workflow (`.github/workflows/build-kernel.yml`) performs the following:
+The workflow (`.github/workflows/build-kernel.yml`) uses **Task for unified local/CI workflows**.
+
+### Workflow Steps
 
 1. **Check Version** - Fetches latest stable kernel from kernel.org (or uses provided version)
 2. **Check Existing Release** - Skips build if release already exists
 3. **Build Matrix** - Builds for both x86_64 and aarch64 in parallel
+   - Installs Task CLI using official install script
+   - Runs `task dev:install-deps` (same command you use locally)
+   - Runs `task kernel:build` with kernel version and architecture
    - **Security**: Always uses `high` verification level (PGP + SHA256)
    - Imports kernel.org autosigner GPG key
    - Verifies PGP signature on `sha256sums.asc`
    - Verifies SHA256 checksum of kernel tarball
    - Builds fail if any verification step fails (fail-secure by design)
-4. **Create Release** - Publishes verified artifacts to GitHub Releases
+4. **Create Release** - Consolidates and signs artifacts
+   - Runs `task release:consolidate-artifacts` to merge multi-arch builds
+   - Runs `task signing:sign-artifacts` with `SIGNING_KEY` secret
+   - Publishes verified artifacts to GitHub Releases
+
+### Local-First Philosophy
+
+The CI workflow uses the exact same commands you run locally:
+- **Local**: `task dev:install-deps` → `task kernel:build`
+- **CI**: `task dev:install-deps` → `task kernel:build`
+
+This ensures:
+- ✅ CI behavior is reproducible locally
+- ✅ Testing locally = testing CI
+- ✅ No CI-specific scripts to maintain
+- ✅ Easy to debug CI failures
 
 **Important:** If a new kernel version is released and the workflow fails with verification errors, this is expected and correct behavior. The workflow will succeed once kernel.org updates their `sha256sums.asc` file (typically within hours of kernel release). This fail-secure behavior ensures distributed kernels are always cryptographically verified.
 
@@ -347,6 +482,7 @@ The workflow (`.github/workflows/build-kernel.yml`) performs the following:
 - All kernels in GitHub releases have been built from PGP-verified sources
 - No kernel is ever released without passing full `high` verification
 - CI never bypasses security checks
+- CI uses the same build process as local development
 
 ### Manual Trigger
 
@@ -397,10 +533,31 @@ on:
 ├── configs/
 │   ├── microvm-kernel-x86_64.config      # Firecracker config for x86_64
 │   └── microvm-kernel-aarch64.config     # Firecracker config for aarch64
-├── get-kernel.sh                         # Get kernel (download or build)
-├── create-test-rootfs.sh                 # Test rootfs creation script
-├── test-kernel.sh                        # End-to-end kernel testing script
-├── Taskfile.dist.yaml                    # Task runner definitions
+├── keys/
+│   ├── cracker-barrel-release.asc        # Public signing key (committed)
+│   └── README.md                         # Key management documentation
+├── scripts/
+│   ├── kernel/
+│   │   ├── build-kernel.sh               # Build kernels from source
+│   │   └── download-kernel.sh            # Download pre-built kernels
+│   ├── firecracker/
+│   │   ├── create-test-rootfs.sh         # Test rootfs creation script
+│   │   └── test-kernel.sh                # End-to-end kernel testing script
+│   └── signing/
+│       ├── sign-artifacts.sh             # Sign artifacts with PGP
+│       ├── verify-artifacts.sh           # Verify PGP signatures
+│       ├── generate-signing-key.sh       # Generate new signing key
+│       ├── rotate-signing-key.sh         # Rotate signing key
+│       ├── check-key-expiry.sh           # Check key expiration
+│       └── remove-signing-key.sh         # Remove signing key
+├── tasks/
+│   ├── kernel/Taskfile.dist.yaml         # Kernel building tasks
+│   ├── firecracker/Taskfile.dist.yaml    # Firecracker testing tasks
+│   ├── clean/Taskfile.dist.yaml          # Cleanup tasks
+│   ├── signing/Taskfile.dist.yaml        # PGP signing and key management
+│   ├── release/Taskfile.dist.yaml        # CI release tasks
+│   └── dev/Taskfile.dist.yaml            # Development utilities
+├── Taskfile.dist.yaml                    # Root task runner (includes all task groups)
 └── README.md                             # This file
 ```
 
@@ -479,19 +636,19 @@ The `test-kernel.sh` script validates kernels by:
 task clean
 
 # Remove only kernel artifacts (keep Firecracker and rootfs)
-task clean-kernel
+task clean:kernel
 
 # Remove specific kernel version
-task clean-kernel VERSION=6.1
+task clean:kernel VERSION=6.1
 
 # Remove cached Firecracker binaries
-task clean-firecracker
+task clean:firecracker
 
 # Remove test rootfs
-task clean-rootfs
+task clean:rootfs
 
 # List all cached artifacts
-task list-artifacts
+task dev:list-artifacts
 ```
 
 ### Manual Cleanup
@@ -517,13 +674,13 @@ rm -f artifacts/test-rootfs.ext4
 **Error: "gpg not found"**
 - GPG is not installed on your system
 - Install GPG: `sudo apt-get install gnupg` (Ubuntu/Debian)
-- Or use medium verification: `./get-kernel.sh --verification-level medium`
+- Or use medium verification: `./scripts/kernel/build-kernel.sh --verification-level medium`
 
 **Error: "Failed to import autosigner key from any keyserver"**
 - Cannot reach keyservers to import kernel.org's autosigner key
 - Check firewall/proxy settings
 - Try again later
-- Or use medium verification: `./get-kernel.sh --verification-level medium`
+- Or use medium verification: `./scripts/kernel/build-kernel.sh --verification-level medium`
 
 **Error: "PGP signature verification failed"**
 - The `sha256sums.asc` file signature is invalid
@@ -540,7 +697,7 @@ rm -f artifacts/test-rootfs.ext4
 **Error: "Checksum verification FAILED"**
 - Downloaded tarball is corrupted or tampered with
 - Remove the tarball: `rm build/linux-*.tar.xz`
-- Try downloading again: `./get-kernel.sh --kernel <version>`
+- Try downloading again: `./scripts/kernel/download-kernel.sh --kernel <version>` or build from source: `./scripts/kernel/build-kernel.sh --kernel <version>`
 - If problem persists, the CDN may be serving corrupted files - wait and retry
 
 **Error: "Could not download checksums file from kernel.org"**
@@ -555,7 +712,7 @@ If the build fails, check:
 - All dependencies are installed
 - Sufficient disk space (kernel builds require ~10GB)
 - Kernel configuration is compatible with the kernel version
-- Try cleaning and rebuilding: `rm -rf build/ artifacts/ && ./get-kernel.sh --force-build`
+- Try cleaning and rebuilding: `rm -rf build/ artifacts/ && ./scripts/kernel/build-kernel.sh`
 
 ### Can't Interrupt with Ctrl-C
 
@@ -570,6 +727,76 @@ Common issues:
 - **Permission denied**: Ensure the workflow has `contents: write` permission
 - **Rate limiting**: GitHub API rate limits may affect release checks
 - **Artifact upload fails**: Check artifact size limits (workflow artifacts have a 2GB limit per file)
+
+## Maintainer Guide
+
+### Setting Up Release Signing
+
+**One-time setup for repository maintainers:**
+
+1. **Generate the signing key:**
+   ```bash
+   task signing:generate-signing-key
+   ```
+
+   This creates:
+   - `.gnupg/` - GPG home directory (gitignored)
+   - `keys/cracker-barrel-release.asc` - Public key (commit this)
+   - `keys/cracker-barrel-release-private.asc` - Private key (DO NOT COMMIT)
+
+   The task will prompt you to add the key to GitHub Actions automatically.
+
+2. **Update README.md with key fingerprint:**
+   - Copy the fingerprint from the `task signing:generate-signing-key` output
+   - Replace the `[TO BE ADDED]` placeholders in the "Verifying Releases" section
+
+3. **Commit the public key:**
+   ```bash
+   git add keys/cracker-barrel-release.asc README.md
+   git commit -m "Add release signing key"
+   git push
+   ```
+
+4. **Secure the private key:**
+   - Back up `keys/cracker-barrel-release-private.asc` to secure location
+   - Delete local copy: `rm keys/cracker-barrel-release-private.asc`
+   - Key is now only in GitHub Actions secrets and your backup
+
+**Testing the signing workflow:**
+
+Before pushing changes, test signing and verification locally:
+```bash
+# Build a kernel
+task kernel:get KERNEL_VERSION=6.1
+
+# Sign the artifacts
+task signing:sign-artifacts
+
+# Verify the signature
+task signing:verify-artifacts
+```
+
+This ensures the signing key and verification process work correctly.
+
+**Key rotation:**
+
+If the signing key needs to be rotated:
+```bash
+# Rotate the key (creates backup and generates new key)
+task signing:rotate
+```
+
+This will:
+- Create timestamped backup of current keys in `keys/backups/YYYY-MM-DD-HHMMSS/`
+- Generate new signing key
+- Optionally update GitHub Actions secret automatically
+- Display new fingerprint for README update
+
+After rotation:
+1. Update README with new fingerprint
+2. Commit new public key
+3. Keep old public key in repo history for verifying old releases
+4. Add note to README about key rotation date
 
 ## Contributing
 

@@ -32,6 +32,16 @@ echo "Creating minimal test rootfs for Firecracker boot testing..."
 echo "  Output: ${OUTPUT_FILE}"
 echo "  Size: ${SIZE_MB}MB"
 
+# Check if rootfs already exists
+if [ -f "${OUTPUT_FILE}" ]; then
+    echo "Test rootfs already exists: ${OUTPUT_FILE}"
+    echo "Delete it first if you want to recreate it: rm ${OUTPUT_FILE}"
+    exit 0
+fi
+
+# Create artifacts directory if it doesn't exist
+mkdir -p "$(dirname "${OUTPUT_FILE}")"
+
 # Create empty ext4 image
 echo "Creating ${SIZE_MB}MB ext4 filesystem image..."
 dd if=/dev/zero of="${OUTPUT_FILE}" bs=1M count=0 seek=${SIZE_MB} 2>/dev/null

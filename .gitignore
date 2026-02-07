@@ -3,6 +3,10 @@ build/
 artifacts/
 bin/
 
+# PGP signing keys
+# (managed by keys/.gitignore)
+.gnupg/
+
 # Task runner (allow local overrides)
 [Tt]askfile.y*ml
 

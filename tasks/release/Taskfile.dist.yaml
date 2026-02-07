@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+tasks:
+  consolidate-artifacts:
+    desc: Consolidate multi-arch artifacts and generate SHA256SUMS (for CI)
+    silent: true
+    summary: |
+      Consolidate artifacts from multiple build jobs into release-artifacts/
+
+      This is used by CI after downloading artifacts from parallel builds.
+      Combines individual .sha256 files into a single SHA256SUMS file.
+
+      Input: all-artifacts/ (from CI artifact downloads)
+      Output: release-artifacts/ with consolidated SHA256SUMS
+    cmds:
+      - |
+        echo "Consolidating artifacts for release..."
+
+        mkdir -p release-artifacts
+
+        # Move all artifacts to release-artifacts directory
+        find all-artifacts -type f -exec mv {} release-artifacts/ \; 2>/dev/null || true
+
+        # Generate combined SHA256SUMS file
+        cd release-artifacts
+
+        # Combine all individual .sha256 files into SHA256SUMS
+        if ls *.sha256 1> /dev/null 2>&1; then
+          cat *.sha256 > SHA256SUMS
+          rm *.sha256
+        fi
+
+        echo "Release artifacts:"
+        ls -lh

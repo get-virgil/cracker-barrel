@@ -1,0 +1,205 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+vars:
+  DETECTED_ARCH:
+    sh: uname -m | sed 's/arm64/aarch64/'
+  ARCH: '{{.ARCH | default .DETECTED_ARCH}}'
+
+tasks:
+  install-deps:
+    desc: Install required build dependencies (Ubuntu/Debian)
+    silent: true
+    interactive: true
+    summary: |
+      Install all required dependencies for building kernels
+
+      This installs:
+        - build-essential (gcc, make, etc.)
+        - Kernel build tools (bison, flex, bc, etc.)
+        - Libraries (libncurses, libssl, libelf)
+        - Utilities (wget, xz-utils, jq, curl)
+        - GPG (gnupg) for PGP signature verification
+
+      For aarch64 cross-compilation, also run:
+        task dev:install-arm-tools
+    cmds:
+      - |
+        echo "Installing build dependencies..."
+        sudo apt-get update
+
+        # Install required packages
+        sudo apt-get install -y \
+          build-essential \
+          libncurses-dev \
+          bison \
+          flex \
+          libssl-dev \
+          libelf-dev \
+          bc \
+          wget \
+          xz-utils \
+          jq \
+          curl \
+          gnupg
+
+        echo ""
+        echo "✓ Dependencies installed successfully"
+        echo ""
+        echo "For aarch64 cross-compilation, also run:"
+        echo "  task dev:install-arm-tools"
+
+  i-use-arch-btw:
+    desc: Install required build dependencies (Arch Linux, ftw)
+    silent: true
+    interactive: true
+    summary: |
+      Install all required dependencies for building kernels on Arch Linux
+
+      This installs:
+        - base-devel (gcc, make, etc.)
+        - Kernel build tools (bison, flex, bc, etc.)
+        - Libraries (ncurses, openssl, libelf, pahole)
+        - Utilities (wget, xz, jq, curl)
+        - GPG (gnupg) for PGP signature verification
+
+      For aarch64 cross-compilation on Arch, also install:
+        sudo pacman -S aarch64-linux-gnu-gcc
+
+      Note: Yes, we know you use Arch. We're very impressed.
+    cmds:
+      - |
+        echo "Installing build dependencies for Arch Linux..."
+        echo "(btw, we know you use Arch)"
+        echo ""
+
+        # Install required packages
+        sudo pacman -S --needed \
+          aarch64-linux-gnu-gcc \
+          base-devel \
+          ncurses \
+          bison \
+          flex \
+          openssl \
+          libelf \
+          bc \
+          pahole \
+          wget \
+          xz \
+          jq \
+          curl \
+          gnupg
+
+        echo ""
+        echo "✓ Dependencies installed successfully"
+        echo "✓ Your Arch installation remains superior"
+
+  install-arm-tools:
+    desc: Install aarch64 cross-compilation toolchain
+    silent: true
+    interactive: true
+    summary: |
+      Install ARM64 (aarch64) cross-compilation toolchain
+
+      Required for building kernels for aarch64 architecture on x86_64 hosts.
+      Run this after 'task dev:install-deps' if you need ARM64 support.
+
+      Example:
+        task dev:install-arm-tools
+        task kernel:build ARCH=aarch64
+    cmds:
+      - |
+        echo "Installing aarch64 cross-compilation toolchain..."
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+        echo ""
+        echo "✓ aarch64 tools installed successfully"
+
+  install-x86-tools:
+    desc: Install x86_64 cross-compilation toolchain
+    silent: true
+    interactive: true
+    summary: |
+      Install x86_64 cross-compilation toolchain
+
+      Required for building kernels for x86_64 architecture on ARM64 hosts.
+      Run this after 'task dev:install-deps' if you need x86_64 support.
+
+      Example:
+        task dev:install-x86-tools
+        task kernel:build ARCH=x86_64
+    cmds:
+      - |
+        echo "Installing x86_64 cross-compilation toolchain..."
+        sudo apt-get install -y gcc-x86-64-linux-gnu
+        echo ""
+        echo "✓ x86_64 tools installed successfully"
+
+  ensure-cross-tools:
+    desc: Install cross-compilation tools if needed for target architecture
+    silent: true
+    interactive: true
+    summary: |
+      Install cross-compilation toolchain if building for different architecture
+
+      Detects runner architecture and target architecture, then installs
+      cross-compilation tools only if they differ.
+
+      Options:
+        ARCH=aarch64  Target architecture (default: auto-detect)
+
+      Examples:
+        task dev:ensure-cross-tools ARCH=aarch64  # On x86_64 runner, installs ARM tools
+        task dev:ensure-cross-tools ARCH=x86_64   # On aarch64 runner, installs x86 tools
+
+      Used by CI to conditionally install cross-compilation tools.
+    cmds:
+      - |
+        RUNNER_ARCH="$(uname -m | sed 's/arm64/aarch64/')"
+        TARGET_ARCH="{{.ARCH}}"
+
+        echo "Runner architecture: $RUNNER_ARCH"
+        echo "Target architecture: $TARGET_ARCH"
+        echo ""
+
+        # Install cross-compilation tools only when runner and target differ
+        if [ "$RUNNER_ARCH" = "x86_64" ] && [ "$TARGET_ARCH" = "aarch64" ]; then
+          echo "Installing aarch64 cross-compilation tools..."
+          task dev:install-arm-tools
+        elif [ "$RUNNER_ARCH" = "aarch64" ] && [ "$TARGET_ARCH" = "x86_64" ]; then
+          echo "Installing x86_64 cross-compilation tools..."
+          task dev:install-x86-tools
+        else
+          echo "Native build - no cross-compilation tools needed"
+        fi
+
+  check-kvm:
+    desc: Check if KVM is available for Firecracker testing
+    silent: true
+    cmds:
+      - |
+        if [ -e /dev/kvm ]; then
+          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            echo "✓ KVM is available and accessible"
+          else
+            echo "✗ KVM exists but not accessible"
+            echo "  Run: sudo chmod 666 /dev/kvm"
+            exit 1
+          fi
+        else
+          echo "✗ KVM not available (/dev/kvm not found)"
+          echo "  Firecracker tests require KVM support"
+          exit 1
+        fi
+
+  list-artifacts:
+    desc: List all cached artifacts
+    silent: true
+    cmds:
+      - echo "=== Kernel Artifacts ==="
+      - ls -lh artifacts/ 2>/dev/null || echo "  (none)"
+      - echo ""
+      - echo "=== Firecracker Binaries ==="
+      - ls -lh bin/ 2>/dev/null || echo "  (none)"
+      - echo ""
+      - echo "=== Build Directory ==="
+      - du -sh build/ 2>/dev/null || echo "  (none)"
