@@ -4,11 +4,11 @@ This directory contains the PGP keys used to sign Cracker Barrel kernel releases
 
 ## Files
 
-- `cracker-barrel-release.asc` - **Public key** (committed to repo)
+- `signing-key.asc` - **Public key** (committed to repo)
   - Used by users to verify kernel releases
   - Safe to distribute publicly
 
-- `cracker-barrel-release-private.asc` - **Private key** (gitignored, DO NOT COMMIT)
+- `signing-key-private.asc` - **Private key** (gitignored, DO NOT COMMIT)
   - Used by CI to sign releases
   - Should only exist:
     - Temporarily during key generation
@@ -25,17 +25,17 @@ task generate-signing-key
 
 This will:
 1. Generate a 4096-bit RSA key pair
-2. Export public key to `keys/cracker-barrel-release.asc`
-3. Export private key to `keys/cracker-barrel-release-private.asc`
+2. Export public key to `keys/signing-key.asc`
+3. Export private key to `keys/signing-key-private.asc`
 4. Display key fingerprint and setup instructions
 
 ## Setup Process
 
 1. Generate keys: `task generate-signing-key`
-2. Add private key to GitHub: `gh secret set SIGNING_KEY < keys/cracker-barrel-release-private.asc`
+2. Add private key to GitHub: `gh secret set SIGNING_KEY < keys/signing-key-private.asc`
 3. Update README.md with fingerprint
-4. Commit public key: `git add keys/cracker-barrel-release.asc README.md`
-5. Delete private key: `rm keys/cracker-barrel-release-private.asc`
+4. Commit public key: `git add keys/signing-key.asc README.md`
+5. Delete private key: `rm keys/signing-key-private.asc`
 
 ## Security Model
 

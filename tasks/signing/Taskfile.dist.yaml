@@ -35,8 +35,8 @@ tasks:
 
       This creates:
         - Private key stored locally in .gnupg/ (gitignored)
-        - Public key exported to keys/cracker-barrel-release.asc (committed)
-        - Private key exported to keys/cracker-barrel-release-private.asc (gitignored)
+        - Public key exported to keys/signing-key.asc (committed)
+        - Private key exported to keys/signing-key-private.asc (gitignored)
         - Optionally adds SIGNING_KEY to GitHub Actions secrets
 
       Options:
@@ -153,8 +153,8 @@ tasks:
 
       This removes:
         - .gnupg/ directory (local GPG keyring)
-        - keys/cracker-barrel-release-private.asc (private key export)
-        - keys/cracker-barrel-release.asc (public key export)
+        - keys/signing-key-private.asc (private key export)
+        - keys/signing-key.asc (public key export)
         - Optionally: SIGNING_KEY from GitHub Actions (with double confirmation)
 
       This does NOT remove:

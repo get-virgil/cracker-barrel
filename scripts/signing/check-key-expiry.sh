@@ -12,8 +12,8 @@
 set -euo pipefail
 
 # Check if key exists
-if [ ! -f "keys/cracker-barrel-release.asc" ]; then
-  echo "Error: No signing key found (keys/cracker-barrel-release.asc)"
+if [ ! -f "keys/signing-key.asc" ]; then
+  echo "Error: No signing key found (keys/signing-key.asc)"
   exit 2
 fi
 
@@ -21,7 +21,7 @@ fi
 TEMP_GNUPG=$(mktemp -d)
 trap "rm -rf $TEMP_GNUPG" EXIT
 
-gpg --homedir "$TEMP_GNUPG" --import keys/cracker-barrel-release.asc 2>/dev/null
+gpg --homedir "$TEMP_GNUPG" --import keys/signing-key.asc 2>/dev/null
 
 # Get key expiration info
 KEY_INFO=$(gpg --homedir "$TEMP_GNUPG" --list-keys --with-colons 2>/dev/null | grep '^pub')

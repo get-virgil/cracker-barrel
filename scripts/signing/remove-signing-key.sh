@@ -3,8 +3,8 @@
 #
 # This removes:
 #   - .gnupg/ directory (local GPG keyring)
-#   - keys/cracker-barrel-release-private.asc (private key export)
-#   - keys/cracker-barrel-release.asc (public key export)
+#   - keys/signing-key-private.asc (private key export)
+#   - keys/signing-key.asc (public key export)
 #   - Optionally: SIGNING_KEY from GitHub Actions (with double confirmation)
 #
 # This does NOT remove:
@@ -45,14 +45,14 @@ echo ""
 # List what will be removed
 echo "The following will be deleted:"
 [ -d ".gnupg" ] && echo "  - .gnupg/ ($(du -sh .gnupg 2>/dev/null | cut -f1))"
-[ -f "keys/cracker-barrel-release-private.asc" ] && echo "  - keys/cracker-barrel-release-private.asc"
-[ -f "keys/cracker-barrel-release.asc" ] && echo "  - keys/cracker-barrel-release.asc"
+[ -f "keys/signing-key-private.asc" ] && echo "  - keys/signing-key-private.asc"
+[ -f "keys/signing-key.asc" ] && echo "  - keys/signing-key.asc"
 echo ""
 
 # Remove files
 rm -rf .gnupg
-rm -f keys/cracker-barrel-release-private.asc
-rm -f keys/cracker-barrel-release.asc
+rm -f keys/signing-key-private.asc
+rm -f keys/signing-key.asc
 
 echo "✓ Local signing keys removed"
 echo ""

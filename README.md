@@ -51,7 +51,7 @@ Visit the [Releases](../../releases) page to download pre-built kernels. Each re
 
 ```bash
 # 1. Import Cracker Barrel release signing key (first time only)
-curl -s https://raw.githubusercontent.com/get-virgil/cracker-barrel/master/keys/cracker-barrel-release.asc | gpg --import
+curl -s https://raw.githubusercontent.com/get-virgil/cracker-barrel/master/keys/signing-key.asc | gpg --import
 
 # Verify the key fingerprint matches (see below)
 gpg --fingerprint releases@cracker-barrel.dev
@@ -316,7 +316,7 @@ archive/
 │   ├── config-6.18.9-aarch64
 │   ├── SHA256SUMS
 │   ├── SHA256SUMS.asc
-│   └── cracker-barrel-release.asc    # Public key (same as releases)
+│   └── signing-key.asc                   # Public key (same as releases)
 ├── 6.18.8/
 │   └── ...
 └── ...
@@ -696,7 +696,7 @@ open https://kernel.org
 │   ├── microvm-kernel-x86_64.config      # Firecracker config for x86_64
 │   └── microvm-kernel-aarch64.config     # Firecracker config for aarch64
 ├── keys/
-│   ├── cracker-barrel-release.asc        # Public signing key (committed)
+│   ├── signing-key.asc                   # Public signing key (committed)
 │   └── README.md                         # Key management documentation
 ├── scripts/
 │   ├── kernel/
@@ -903,8 +903,8 @@ Common issues:
 
    This creates:
    - `.gnupg/` - GPG home directory (gitignored)
-   - `keys/cracker-barrel-release.asc` - Public key (commit this)
-   - `keys/cracker-barrel-release-private.asc` - Private key (DO NOT COMMIT)
+   - `keys/signing-key.asc` - Public key (commit this)
+   - `keys/signing-key-private.asc` - Private key (DO NOT COMMIT)
 
    The task will prompt you to add the key to GitHub Actions automatically.
 
@@ -914,14 +914,14 @@ Common issues:
 
 3. **Commit the public key:**
    ```bash
-   git add keys/cracker-barrel-release.asc README.md
+   git add keys/signing-key.asc README.md
    git commit -m "Add release signing key"
    git push
    ```
 
 4. **Secure the private key:**
-   - Back up `keys/cracker-barrel-release-private.asc` to secure location
-   - Delete local copy: `rm keys/cracker-barrel-release-private.asc`
+   - Back up `keys/signing-key-private.asc` to secure location
+   - Delete local copy: `rm keys/signing-key-private.asc`
    - Key is now only in GitHub Actions secrets and your backup
 
 **Testing the signing workflow:**

@@ -25,8 +25,8 @@ echo "Verifying PGP signature on $TARGET_DIR/SHA256SUMS..."
 echo ""
 
 # Import public key
-if [ -f "keys/cracker-barrel-release.asc" ]; then
-  gpg --import keys/cracker-barrel-release.asc 2>/dev/null || true
+if [ -f "keys/signing-key.asc" ]; then
+  gpg --import keys/signing-key.asc 2>/dev/null || true
 fi
 
 # Verify the signature

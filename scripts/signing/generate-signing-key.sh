@@ -3,8 +3,8 @@
 #
 # This creates:
 #   - Private key stored locally in .gnupg/ (gitignored)
-#   - Public key exported to keys/cracker-barrel-release.asc (committed)
-#   - Private key exported to keys/cracker-barrel-release-private.asc (gitignored)
+#   - Public key exported to keys/signing-key.asc (committed)
+#   - Private key exported to keys/signing-key-private.asc (gitignored)
 #   - Public key history in keys/history/YYYY-MM-DD-HHMMSS.asc (committed)
 #   - Initial backup in keys/backups/initial-*
 #
@@ -25,7 +25,7 @@ echo "Checking for existing local signing key..."
 echo ""
 
 # Check if local key already exists
-if [ -d ".gnupg" ] || [ -f "keys/cracker-barrel-release.asc" ]; then
+if [ -d ".gnupg" ] || [ -f "keys/signing-key.asc" ]; then
   echo "Error: Local signing key already exists"
   echo ""
   echo "Options:"
@@ -61,23 +61,23 @@ gpg --homedir .gnupg --batch --generate-key .gnupg/keygen.batch
 KEY_ID=$(gpg --homedir .gnupg --list-keys --with-colons | grep '^pub' | cut -d: -f5)
 
 # Export public key
-gpg --homedir .gnupg --armor --export "$KEY_ID" > keys/cracker-barrel-release.asc
+gpg --homedir .gnupg --armor --export "$KEY_ID" > keys/signing-key.asc
 
 # Export private key (for GitHub Actions secret)
-gpg --homedir .gnupg --armor --export-secret-keys "$KEY_ID" > keys/cracker-barrel-release-private.asc
+gpg --homedir .gnupg --armor --export-secret-keys "$KEY_ID" > keys/signing-key-private.asc
 
 # Save public key to history (committed to git for audit trail)
 TIMESTAMP=$(date -u +%Y-%m-%d-%H%M%S)
 mkdir -p keys/history
-cp keys/cracker-barrel-release.asc "keys/history/${TIMESTAMP}.asc"
+cp keys/signing-key.asc "keys/history/${TIMESTAMP}.asc"
 echo "✓ Public key saved to history: keys/history/${TIMESTAMP}.asc (UTC)"
 
 # Create initial backup
 BACKUP_DIR="keys/backups/initial-${TIMESTAMP}"
 mkdir -p "$BACKUP_DIR"
 cp -r .gnupg "$BACKUP_DIR/"
-cp keys/cracker-barrel-release.asc "$BACKUP_DIR/"
-cp keys/cracker-barrel-release-private.asc "$BACKUP_DIR/"
+cp keys/signing-key.asc "$BACKUP_DIR/"
+cp keys/signing-key-private.asc "$BACKUP_DIR/"
 
 echo ""
 echo "✓ Signing key generated successfully!"
@@ -104,29 +104,29 @@ if command -v gh &>/dev/null; then
 
     echo ""
     echo "Adding SIGNING_KEY to GitHub Actions..."
-    gh secret set SIGNING_KEY < keys/cracker-barrel-release-private.asc
+    gh secret set SIGNING_KEY < keys/signing-key-private.asc
     echo "✓ SIGNING_KEY added to GitHub Actions"
   else
     echo "Skipped GitHub Actions setup"
     echo ""
     echo "To add manually later:"
-    echo "  gh secret set SIGNING_KEY < keys/cracker-barrel-release-private.asc"
+    echo "  gh secret set SIGNING_KEY < keys/signing-key-private.asc"
   fi
 else
   echo "Note: gh CLI not available (skipping GitHub setup)"
   echo ""
   echo "To add to GitHub manually later:"
-  echo "  gh secret set SIGNING_KEY < keys/cracker-barrel-release-private.asc"
+  echo "  gh secret set SIGNING_KEY < keys/signing-key-private.asc"
 fi
 
 echo ""
 echo "Next steps:"
 echo "  1. Update README.md with the public key fingerprint above"
 echo "  2. Commit the public key and history:"
-echo "     git add keys/cracker-barrel-release.asc keys/history/ README.md"
+echo "     git add keys/signing-key.asc keys/history/ README.md"
 echo "  3. Securely delete private key after uploading to GitHub:"
-echo "     rm keys/cracker-barrel-release-private.asc"
+echo "     rm keys/signing-key-private.asc"
 echo ""
-echo "Public key: keys/cracker-barrel-release.asc (commit this)"
+echo "Public key: keys/signing-key.asc (commit this)"
 echo "Key history: keys/history/${TIMESTAMP}.asc (commit this)"
-echo "Private key: keys/cracker-barrel-release-private.asc (DO NOT COMMIT)"
+echo "Private key: keys/signing-key-private.asc (DO NOT COMMIT)"

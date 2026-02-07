@@ -143,7 +143,7 @@ jobs:
           - \`config-${KERNEL_VERSION}-aarch64\` - Kernel configuration for aarch64
           - \`SHA256SUMS\` - Checksums of decompressed kernels
           - \`SHA256SUMS.asc\` - PGP signature of SHA256SUMS
-          - \`cracker-barrel-release.asc\` - Public key used to sign this release
+          - \`signing-key.asc\` - Public key used to sign this release
 
           ## Usage
 
@@ -178,8 +178,8 @@ jobs:
 
           \`\`\`bash
           # Download and import the public key from this release
-          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/cracker-barrel-release.asc
-          gpg --import cracker-barrel-release.asc
+          wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/signing-key.asc
+          gpg --import signing-key.asc
 
           # Download checksums and signature
           wget https://github.com/${{ github.repository }}/releases/download/v${KERNEL_VERSION}/SHA256SUMS

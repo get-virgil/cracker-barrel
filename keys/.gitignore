@@ -28,7 +28,7 @@ backups/
 
 # === ALLOW PUBLIC KEY AND DOCS (COMMIT THESE) ===
 # These files SHOULD be committed to the repository
-!cracker-barrel-release.asc  # Public key (users need this to verify releases)
+!signing-key.asc              # Public key (users need this to verify releases)
 !README.md                    # Documentation about key management
 !.gitignore                   # This file
 

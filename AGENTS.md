@@ -351,7 +351,7 @@ fi
 generate-signing-key:
   cmds:
     - |
-      if [ -d ".gnupg" ] || [ -f "keys/cracker-barrel-release.asc" ]; then
+      if [ -d ".gnupg" ] || [ -f "keys/signing-key.asc" ]; then
         echo "Error: Local signing key already exists"
         exit 1
       fi

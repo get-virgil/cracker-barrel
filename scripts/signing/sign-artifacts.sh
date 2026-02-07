@@ -101,8 +101,8 @@ else
     cp -v "$TARGET_DIR"/* "$ARCHIVE_DIR/" 2>/dev/null || true
 
     # Include public key (like in releases)
-    if [ -f "keys/cracker-barrel-release.asc" ]; then
-        cp -v keys/cracker-barrel-release.asc "$ARCHIVE_DIR/"
+    if [ -f "keys/signing-key.asc" ]; then
+        cp -v keys/signing-key.asc "$ARCHIVE_DIR/"
     fi
 
     echo ""

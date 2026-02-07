@@ -39,19 +39,19 @@ if [ -d ".gnupg" ]; then
   echo "  ✓ Backed up .gnupg/"
 fi
 
-if [ -f "keys/cracker-barrel-release.asc" ]; then
-  cp keys/cracker-barrel-release.asc "$BACKUP_DIR/"
-  echo "  ✓ Backed up keys/cracker-barrel-release.asc"
+if [ -f "keys/signing-key.asc" ]; then
+  cp keys/signing-key.asc "$BACKUP_DIR/"
+  echo "  ✓ Backed up keys/signing-key.asc"
 
   # Save old public key to history (committed to git for audit trail)
   mkdir -p keys/history
-  cp keys/cracker-barrel-release.asc "keys/history/${TIMESTAMP}.asc"
+  cp keys/signing-key.asc "keys/history/${TIMESTAMP}.asc"
   echo "  ✓ Old public key saved to history: keys/history/${TIMESTAMP}.asc (UTC)"
 fi
 
-if [ -f "keys/cracker-barrel-release-private.asc" ]; then
-  cp keys/cracker-barrel-release-private.asc "$BACKUP_DIR/"
-  echo "  ✓ Backed up keys/cracker-barrel-release-private.asc"
+if [ -f "keys/signing-key-private.asc" ]; then
+  cp keys/signing-key-private.asc "$BACKUP_DIR/"
+  echo "  ✓ Backed up keys/signing-key-private.asc"
 fi
 
 echo ""
@@ -82,10 +82,10 @@ gpg --homedir .gnupg --batch --generate-key .gnupg/keygen.batch
 KEY_ID=$(gpg --homedir .gnupg --list-keys --with-colons | grep '^pub' | cut -d: -f5 | tail -1)
 
 # Export new public key (overwrites old one)
-gpg --homedir .gnupg --armor --export "$KEY_ID" > keys/cracker-barrel-release.asc
+gpg --homedir .gnupg --armor --export "$KEY_ID" > keys/signing-key.asc
 
 # Export new private key (overwrites old one)
-gpg --homedir .gnupg --armor --export-secret-keys "$KEY_ID" > keys/cracker-barrel-release-private.asc
+gpg --homedir .gnupg --armor --export-secret-keys "$KEY_ID" > keys/signing-key-private.asc
 
 echo ""
 echo "✓ New signing key generated successfully!"
@@ -104,7 +104,7 @@ if command -v gh &>/dev/null; then
     if [[ "$response" =~ ^[Yy]$ ]]; then
       echo ""
       echo "Updating SIGNING_KEY in GitHub Actions..."
-      gh secret set SIGNING_KEY < keys/cracker-barrel-release-private.asc
+      gh secret set SIGNING_KEY < keys/signing-key-private.asc
       echo "✓ SIGNING_KEY updated in GitHub Actions"
     else
       echo "Skipped GitHub Actions update"
@@ -118,7 +118,7 @@ fi
 
 echo ""
 echo "To update GitHub secret manually later:"
-echo "  gh secret set SIGNING_KEY < keys/cracker-barrel-release-private.asc"
+echo "  gh secret set SIGNING_KEY < keys/signing-key-private.asc"
 
 echo ""
 echo "All keys in keyring (old and new):"
@@ -127,9 +127,9 @@ echo ""
 echo "Next steps:"
 echo "  1. Update README.md with the new public key fingerprint above"
 echo "  2. Commit the new public key and old key history:"
-echo "     git add keys/cracker-barrel-release.asc keys/history/ README.md"
+echo "     git add keys/signing-key.asc keys/history/ README.md"
 echo "  3. Securely delete private key after uploading to GitHub:"
-echo "     rm keys/cracker-barrel-release-private.asc"
+echo "     rm keys/signing-key-private.asc"
 echo ""
 echo "Old key saved to: keys/history/${TIMESTAMP}.asc (commit this)"
 echo "Backup location: $BACKUP_DIR"
