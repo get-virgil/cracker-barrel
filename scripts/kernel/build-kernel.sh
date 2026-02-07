@@ -67,7 +67,8 @@ import_autosigner_key() {
             info "✓ Autosigner key imported successfully"
 
             # Verify the fingerprint matches
-            IMPORTED_FP=$(gpg --fingerprint "$AUTOSIGNER_KEY_ID" 2>/dev/null | grep -A1 "Key fingerprint" | tail -1 | tr -d ' ')
+            # Modern GPG output format: fingerprint is on line after "pub"
+            IMPORTED_FP=$(gpg --fingerprint "$AUTOSIGNER_KEY_ID" 2>/dev/null | awk '/^pub/{getline; print}' | tr -d ' ')
             EXPECTED_FP=$(echo "$AUTOSIGNER_KEY_FINGERPRINT" | tr -d ' ')
 
             if [ "$IMPORTED_FP" != "$EXPECTED_FP" ]; then
