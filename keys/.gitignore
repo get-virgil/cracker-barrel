@@ -31,3 +31,10 @@ backups/
 !cracker-barrel-release.asc  # Public key (users need this to verify releases)
 !README.md                    # Documentation about key management
 !.gitignore                   # This file
+
+# === PUBLIC KEY HISTORY (COMMIT THIS) ===
+# Historical public keys from key rotations
+# Generated with UTC timestamp: keys/history/YYYY-MM-DD-HHMMSS.asc
+# Allows verification of old releases after key rotation
+!history/
+!history/*.asc

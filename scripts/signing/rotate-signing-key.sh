@@ -3,9 +3,10 @@
 #
 # This will:
 #   1. Create timestamped backup of current keys
-#   2. Generate new signing key
-#   3. Display new key fingerprint for README update
-#   4. Optionally update GitHub Actions SIGNING_KEY secret (if gh CLI available)
+#   2. Save old public key to keys/history/YYYY-MM-DD-HHMMSS.asc (committed)
+#   3. Generate new signing key
+#   4. Display new key fingerprint for README update
+#   5. Optionally update GitHub Actions SIGNING_KEY secret (if gh CLI available)
 #
 # Environment variables:
 #   SIGNING_KEY_NAME   - Key owner name (default: "Cracker Barrel Release Signing")
@@ -28,7 +29,8 @@ echo ""
 echo "Creating backup of current keys..."
 
 # Create timestamped backup directory
-BACKUP_DIR="keys/backups/$(date +%Y-%m-%d-%H%M%S)"
+TIMESTAMP=$(date -u +%Y-%m-%d-%H%M%S)
+BACKUP_DIR="keys/backups/${TIMESTAMP}"
 mkdir -p "$BACKUP_DIR"
 
 # Backup current keys
@@ -40,6 +42,11 @@ fi
 if [ -f "keys/cracker-barrel-release.asc" ]; then
   cp keys/cracker-barrel-release.asc "$BACKUP_DIR/"
   echo "  ✓ Backed up keys/cracker-barrel-release.asc"
+
+  # Save old public key to history (committed to git for audit trail)
+  mkdir -p keys/history
+  cp keys/cracker-barrel-release.asc "keys/history/${TIMESTAMP}.asc"
+  echo "  ✓ Old public key saved to history: keys/history/${TIMESTAMP}.asc (UTC)"
 fi
 
 if [ -f "keys/cracker-barrel-release-private.asc" ]; then
@@ -119,9 +126,10 @@ gpg --homedir .gnupg --list-keys
 echo ""
 echo "Next steps:"
 echo "  1. Update README.md with the new public key fingerprint above"
-echo "  2. Commit the new public key:"
-echo "     git add keys/cracker-barrel-release.asc README.md"
+echo "  2. Commit the new public key and old key history:"
+echo "     git add keys/cracker-barrel-release.asc keys/history/ README.md"
 echo "  3. Securely delete private key after uploading to GitHub:"
 echo "     rm keys/cracker-barrel-release-private.asc"
 echo ""
+echo "Old key saved to: keys/history/${TIMESTAMP}.asc (commit this)"
 echo "Backup location: $BACKUP_DIR"

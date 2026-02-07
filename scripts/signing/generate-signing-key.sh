@@ -5,6 +5,7 @@
 #   - Private key stored locally in .gnupg/ (gitignored)
 #   - Public key exported to keys/cracker-barrel-release.asc (committed)
 #   - Private key exported to keys/cracker-barrel-release-private.asc (gitignored)
+#   - Public key history in keys/history/YYYY-MM-DD-HHMMSS.asc (committed)
 #   - Initial backup in keys/backups/initial-*
 #
 # Environment variables:
@@ -65,8 +66,14 @@ gpg --homedir .gnupg --armor --export "$KEY_ID" > keys/cracker-barrel-release.as
 # Export private key (for GitHub Actions secret)
 gpg --homedir .gnupg --armor --export-secret-keys "$KEY_ID" > keys/cracker-barrel-release-private.asc
 
+# Save public key to history (committed to git for audit trail)
+TIMESTAMP=$(date -u +%Y-%m-%d-%H%M%S)
+mkdir -p keys/history
+cp keys/cracker-barrel-release.asc "keys/history/${TIMESTAMP}.asc"
+echo "✓ Public key saved to history: keys/history/${TIMESTAMP}.asc (UTC)"
+
 # Create initial backup
-BACKUP_DIR="keys/backups/initial-$(date +%Y-%m-%d-%H%M%S)"
+BACKUP_DIR="keys/backups/initial-${TIMESTAMP}"
 mkdir -p "$BACKUP_DIR"
 cp -r .gnupg "$BACKUP_DIR/"
 cp keys/cracker-barrel-release.asc "$BACKUP_DIR/"
@@ -115,10 +122,11 @@ fi
 echo ""
 echo "Next steps:"
 echo "  1. Update README.md with the public key fingerprint above"
-echo "  2. Commit the public key:"
-echo "     git add keys/cracker-barrel-release.asc README.md"
+echo "  2. Commit the public key and history:"
+echo "     git add keys/cracker-barrel-release.asc keys/history/ README.md"
 echo "  3. Securely delete private key after uploading to GitHub:"
 echo "     rm keys/cracker-barrel-release-private.asc"
 echo ""
 echo "Public key: keys/cracker-barrel-release.asc (commit this)"
+echo "Key history: keys/history/${TIMESTAMP}.asc (commit this)"
 echo "Private key: keys/cracker-barrel-release-private.asc (DO NOT COMMIT)"
