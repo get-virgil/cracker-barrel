@@ -21,6 +21,9 @@ includes:
   dev:
     taskfile: tasks/dev
     dir: .
+  docs:
+    taskfile: docs
+    dir: ./docs
 
 tasks:
   default:

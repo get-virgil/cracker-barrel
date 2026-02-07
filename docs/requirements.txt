@@ -1,0 +1,8 @@
+sphinx
+myst-parser
+sphinx-rtd-theme
+sphinx-autobuild
+sphinx-tabs
+sphinx-copybutton
+sphinx-togglebutton
+sphinxcontrib-jquery

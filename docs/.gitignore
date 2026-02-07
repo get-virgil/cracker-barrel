@@ -1,0 +1,5 @@
+# Sphinx build directory
+docs/
+
+# Virtual environment
+.venv/

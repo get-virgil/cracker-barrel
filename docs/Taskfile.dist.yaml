@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+vars:
+  VENV: .venv
+  PIP: "{{.VENV}}/bin/pip"
+  SPHINX_BUILD: "{{.VENV}}/bin/sphinx-build"
+  SPHINX_AUTOBUILD: "{{.VENV}}/bin/sphinx-autobuild"
+  SPHINX_OPTS: '{{.SPHINX_OPTS | default ""}}'
+
+tasks:
+
+  install:
+    desc: Install documentation dependencies
+    deps: [create-venv]
+    cmds:
+      - "{{.PIP}} install -r requirements.txt"
+    status:
+      - test -f {{.SPHINX_BUILD}}
+      - test -f {{.SPHINX_AUTOBUILD}}
+
+  build:
+    desc: Build documentation
+    deps: [install]
+    cmds:
+      - "{{.SPHINX_BUILD}} {{.SPHINX_OPTS}} -b html source docs"
+
+  clean:
+    desc: Clean build directory
+    cmds:
+      - rm -rf docs/
+
+  linkcheck:
+    desc: Check for broken links
+    deps: [install]
+    cmds:
+      - "{{.SPHINX_BUILD}} {{.SPHINX_OPTS}} -b linkcheck source docs/linkcheck"
+
+  serve:
+    desc: Build and serve full site with landing page (no auto-reload)
+    deps: [install, build]
+    cmds:
+      - python -m http.server 8000 --directory .
+
+  serve-dev:
+    desc: Serve docs with live auto-reload (bypasses landing page)
+    deps: [install]
+    cmds:
+      - "{{.SPHINX_AUTOBUILD}} source docs --port 8000"
+
+  ci:
+    desc: CI checks for documentation
+    cmds:
+      - task: build
+        vars: { SPHINX_OPTS: -W }
+      - task: linkcheck
+        vars: { SPHINX_OPTS: -W }
+
+  create-venv:
+    desc: Create the Python virtual environment
+    internal: true
+    cmds:
+      - python -m venv .venv
+    status:
+      - test -f {{.VENV}}/bin/python
+
+
