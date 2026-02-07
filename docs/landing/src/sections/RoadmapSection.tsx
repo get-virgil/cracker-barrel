@@ -128,7 +128,7 @@ export default function RoadmapSection({ className = '' }: RoadmapSectionProps) 
       {/* Background Image */}
       <div className="absolute inset-0 w-full h-full">
         <img 
-          src="/roadmap_city_bg.jpg" 
+          src="./roadmap_city_bg.jpg" 
           alt="Night City"
           className="w-full h-full object-cover"
         />

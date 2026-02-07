@@ -135,7 +135,7 @@ export default function CommunitySection({ className = '' }: CommunitySectionPro
       {/* Background Image */}
       <div className="absolute inset-0 w-full h-full">
         <img 
-          src="/community_booth_bg.jpg" 
+          src="./community_booth_bg.jpg" 
           alt="Diner Booth"
           className="w-full h-full object-cover"
         />

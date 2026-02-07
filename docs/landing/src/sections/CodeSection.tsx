@@ -131,7 +131,7 @@ export default function CodeSection({ className = '' }: CodeSectionProps) {
         className="absolute inset-0 w-full h-full"
       >
         <img 
-          src="/chrome_code_bg.jpg" 
+          src="./chrome_code_bg.jpg" 
           alt="Chrome Interior"
           className="w-full h-full object-cover"
         />

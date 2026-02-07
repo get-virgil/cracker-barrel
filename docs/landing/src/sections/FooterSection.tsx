@@ -94,7 +94,7 @@ export default function FooterSection({ className = '' }: FooterSectionProps) {
       {/* Background Image */}
       <div className="absolute inset-0 w-full h-full">
         <img 
-          src="/footer_diner_bg.jpg" 
+          src="./footer_diner_bg.jpg" 
           alt="Diner Interior"
           className="w-full h-full object-cover"
         />

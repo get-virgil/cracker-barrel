@@ -143,7 +143,7 @@ export default function DetailsSection({ className = '' }: DetailsSectionProps) 
         className="absolute inset-0 w-full h-full"
       >
         <img 
-          src="/detail_counter_bg.jpg" 
+          src="./detail_counter_bg.jpg" 
           alt="Diner Counter"
           className="w-full h-full object-cover"
         />
@@ -164,7 +164,7 @@ export default function DetailsSection({ className = '' }: DetailsSectionProps) 
               className="relative w-full lg:w-[55%] h-48 lg:h-full overflow-hidden"
             >
               <img 
-                src="/detail_feature_media.jpg" 
+                src="./detail_feature_media.jpg" 
                 alt="Kitchen Window"
                 className="w-full h-full object-cover"
               />

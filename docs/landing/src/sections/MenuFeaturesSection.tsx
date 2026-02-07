@@ -16,7 +16,7 @@ const menuItems = [
     description: 'Pre-built, pressed, and ready. Firecracker-optimized. Just heat and serve.',
     link: 'Get kernels',
     href: './docs/getting-started/github-releases.html',
-    image: '/menu_plate_1_kernel.jpg'
+    image: './menu_plate_1_kernel.jpg'
   },
   {
     id: 2,
@@ -24,7 +24,7 @@ const menuItems = [
     description: 'Cryptographically signed to perfection. PGP verification on every order.',
     link: 'See the proof',
     href: './docs/reference/security-model.html',
-    image: '/menu_plate_2_init.jpg'
+    image: './menu_plate_2_init.jpg'
   },
   {
     id: 3,
@@ -32,7 +32,7 @@ const menuItems = [
     description: 'Fresh kernel builds every morning. Latest stable. Never frozen.',
     link: 'How it works',
     href: './docs/user-guide/github-workflow/automated-releases.html',
-    image: '/menu_plate_3_rootfs.jpg'
+    image: './menu_plate_3_rootfs.jpg'
   }
 ];
 
@@ -136,7 +136,7 @@ export default function MenuFeaturesSection({ className = '' }: MenuFeaturesSect
         className="absolute inset-0 w-full h-full"
       >
         <img 
-          src="/menu_diner_bg.jpg" 
+          src="./menu_diner_bg.jpg" 
           alt="Diner Counter"
           className="w-full h-full object-cover"
         />

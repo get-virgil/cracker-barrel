@@ -145,7 +145,7 @@ export default function HeroSection({ className = '' }: HeroSectionProps) {
         className="absolute inset-0 w-full h-full"
       >
         <img 
-          src="/hero_diner_bg.jpg" 
+          src="./hero_diner_bg.jpg" 
           alt="Cyberpunk Diner"
           className="w-full h-full object-cover"
         />
@@ -169,7 +169,7 @@ export default function HeroSection({ className = '' }: HeroSectionProps) {
         {/* Cyborg Chicken Chef */}
         <img 
           ref={chickenRef}
-          src="/cyborg_chicken_chef.png" 
+          src="./cyborg_chicken_chef.png" 
           alt="Cyborg Chicken Chef"
           className="w-[clamp(120px,20vw,200px)] h-auto object-contain mb-6 drop-shadow-2xl"
         />
