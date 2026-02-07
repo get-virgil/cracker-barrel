@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write  # Required for creating releases
+  issues: write    # Required for closing build request issues
 
 jobs:
   check-version:
@@ -272,3 +273,52 @@ jobs:
             release-artifacts/*
 
           echo "Release $TAG created successfully!"
+
+      - name: Close build request issues
+        if: success()
+        env:
+          KERNEL_VERSION: ${{ needs.check-version.outputs.kernel_version }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const version = process.env.KERNEL_VERSION;
+
+            // Search for open issues with build-in-progress label and matching version
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:open label:build-in-progress "${version}"`;
+
+            const issues = await github.rest.search.issuesAndPullRequests({
+              q: query
+            });
+
+            for (const issue of issues.data.items) {
+              // Add success comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `## ✅ Build Complete
+
+                Kernel version **${version}** has been successfully built and published!
+
+                **Download the release:** https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/v${version}
+
+                **What's included:**
+                - Pre-built kernels for x86_64 and aarch64
+                - Kernel configurations
+                - SHA256 checksums
+                - PGP signatures for verification
+
+                Thank you for your build request!`
+              });
+
+              // Close issue and update labels
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                labels: ['build-request', 'completed']
+              });
+
+              console.log(`Closed issue #${issue.number} for kernel ${version}`);
+            }
