@@ -35,25 +35,33 @@ wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/SHA25
 gpg --verify SHA256SUMS.asc SHA256SUMS
 # Should show: "Good signature from Cracker Barrel Release Signing"
 
-# 4. Decompress kernel
+# 4. Verify download
+sha256sum -c SHA256SUMS --ignore-missing
+# Verifies: vmlinux-VERSION-x86_64.xz
+
+# 5. Decompress kernel
 xz -d vmlinux-VERSION-x86_64.xz
 
-# 5. Verify kernel checksum
+# 6. Verify kernel binary
 sha256sum -c SHA256SUMS --ignore-missing
+# Verifies: vmlinux-VERSION-x86_64
 ```
+
+**Why two checksums?**
+- `.xz` checksum: Verify download immediately when it finishes (supports streaming verification)
+- Kernel binary checksum: Verify the actual kernel you're running on your system
 
 ### Checksum Only (Basic)
 
 If you trust GitHub's infrastructure:
 
 ```bash
-# Download kernel and checksums
 wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/vmlinux-VERSION-x86_64.xz
 wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/SHA256SUMS
 
-# Decompress and verify checksum
+sha256sum -c SHA256SUMS --ignore-missing  # Verify download
 xz -d vmlinux-VERSION-x86_64.xz
-sha256sum -c SHA256SUMS --ignore-missing
+sha256sum -c SHA256SUMS --ignore-missing  # Verify kernel binary
 ```
 
 ## Release Signing Key
@@ -85,8 +93,8 @@ Understanding the verification layers:
 ### Layer 3: Build Artifact Signing
 - Pre-built kernels include SHA256 checksums in releases
 - Checksums file is PGP-signed by Cracker Barrel release key
-- Users verify downloaded kernels before use
-- Checksums calculated from decompressed binaries
+- Checksums for compressed files (`.xz`) enable immediate download verification
+- Checksums for kernel binaries verify what you're running on your system
 
 ## What Verification Protects Against
 

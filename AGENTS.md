@@ -424,6 +424,46 @@ error() {
 
 Tasks should use `silent: true` to avoid echoing commands, letting script output be clean.
 
+### Checksum Pattern
+
+Generate checksums for both compressed and decompressed kernels:
+
+```bash
+# scripts/kernel/build-kernel.sh
+(cd "$ARTIFACTS_DIR" && sha256sum "$OUTPUT_NAME" > "${OUTPUT_NAME}.sha256")
+xz -9 -k -T0 "$ARTIFACTS_DIR/$OUTPUT_NAME"
+(cd "$ARTIFACTS_DIR" && sha256sum "${OUTPUT_NAME}.xz" > "${OUTPUT_NAME}.xz.sha256")
+```
+
+**Use cases:**
+- `.xz` checksums: Download verification (immediate feedback, supports streaming)
+- Kernel binary checksums: Runtime verification (verify what you're actually using)
+
+Consolidate into single `SHA256SUMS`:
+
+```bash
+# scripts/signing/sign-artifacts.sh
+for file in vmlinux-* Image-*; do
+    if [ -f "$file" ] && [[ ! "$file" =~ \.(xz|sha256)$ ]]; then
+        sha256sum "$file" >> SHA256SUMS
+    fi
+done
+
+for file in vmlinux-*.xz Image-*.xz; do
+    if [ -f "$file" ]; then
+        sha256sum "$file" >> SHA256SUMS
+    fi
+done
+```
+
+Verify with separation by file type:
+
+```bash
+# scripts/signing/verify-artifacts.sh
+sha256sum -c SHA256SUMS --ignore-missing | grep -E '\.xz:'      # Downloads
+sha256sum -c SHA256SUMS --ignore-missing | grep -vE '\.xz:'     # Kernel binaries
+```
+
 ## Testing Patterns
 
 ### Task Testing Workflow

@@ -55,11 +55,16 @@ wget https://github.com/get-virgil/cracker-barrel/releases/latest/download/SHA25
 gpg --verify SHA256SUMS.asc SHA256SUMS
 # Should show: "Good signature from Cracker Barrel Release Signing"
 
-# 4. Decompress kernel
+# 4. Verify download immediately
+sha256sum -c SHA256SUMS --ignore-missing
+# Verifies: vmlinux-VERSION-x86_64.xz
+
+# 5. Decompress kernel
 xz -d vmlinux-VERSION-x86_64.xz
 
-# 5. Verify kernel checksum
+# 6. Verify kernel binary before use
 sha256sum -c SHA256SUMS --ignore-missing
+# Verifies: vmlinux-VERSION-x86_64
 ```
 
 **Cracker Barrel Release Signing Key:**

@@ -36,19 +36,57 @@ if gpg --verify SHA256SUMS.asc SHA256SUMS 2>&1; then
   echo ""
   echo "✓ PGP signature verification PASSED"
   echo ""
-  echo "Now verifying kernel checksums..."
-  echo ""
 
-  # Verify checksums
-  if sha256sum -c SHA256SUMS --ignore-missing 2>&1; then
+  # Two-stage verification: compressed (download integrity) + decompressed (build integrity)
+  COMPRESSED_FAILED=0
+  DECOMPRESSED_FAILED=0
+
+  # Stage 1: Verify compressed kernels (download integrity)
+  echo "Stage 1: Verifying compressed kernels (.xz files - download integrity)..."
+  echo ""
+  if sha256sum -c SHA256SUMS --ignore-missing 2>&1 | grep -E '\.xz:'; then
     echo ""
-    echo "✓ Checksum verification PASSED"
+  else
+    # No compressed files found - this is OK for backward compatibility
+    echo "(No compressed kernel files found to verify)"
+    echo ""
+  fi
+
+  # Check if any compressed files failed
+  if sha256sum -c SHA256SUMS --ignore-missing 2>&1 | grep -E '\.xz:.*FAILED'; then
+    COMPRESSED_FAILED=1
+  fi
+
+  # Stage 2: Verify decompressed kernels (build integrity)
+  echo "Stage 2: Verifying decompressed kernels (build integrity)..."
+  echo ""
+  if sha256sum -c SHA256SUMS --ignore-missing 2>&1 | grep -vE '\.xz:'; then
+    echo ""
+  else
+    # No decompressed files found - this might be an issue
+    echo "(No decompressed kernel files found to verify)"
+    echo ""
+  fi
+
+  # Check if any decompressed files failed
+  if sha256sum -c SHA256SUMS --ignore-missing 2>&1 | grep -vE '\.xz:' | grep 'FAILED'; then
+    DECOMPRESSED_FAILED=1
+  fi
+
+  # Overall result
+  if [ $COMPRESSED_FAILED -eq 1 ] || [ $DECOMPRESSED_FAILED -eq 1 ]; then
+    echo "✗ Checksum verification FAILED"
+    if [ $COMPRESSED_FAILED -eq 1 ]; then
+      echo "  - Compressed kernel verification failed (download may be corrupted)"
+    fi
+    if [ $DECOMPRESSED_FAILED -eq 1 ]; then
+      echo "  - Decompressed kernel verification failed (build may be corrupted)"
+    fi
+    exit 1
+  else
+    echo "✓ All checksum verifications PASSED"
     echo ""
     echo "All verifications successful!"
-  else
-    echo ""
-    echo "✗ Checksum verification FAILED"
-    exit 1
   fi
 else
   echo ""

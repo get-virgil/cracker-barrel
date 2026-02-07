@@ -26,13 +26,24 @@ cd "$TARGET_DIR"
 if [ ! -f "SHA256SUMS" ]; then
     rm -f SHA256SUMS
 
-    # Calculate checksums of decompressed kernels
+    # Calculate checksums of both decompressed and compressed kernels
+    # This provides two-stage verification: compressed (download) + decompressed (build)
     shopt -s nullglob
+
+    # First, add checksums for decompressed kernels
     for file in vmlinux-* Image-*; do
         if [ -f "$file" ] && [[ ! "$file" =~ \.(xz|sha256)$ ]]; then
             sha256sum "$file" >> SHA256SUMS
         fi
     done
+
+    # Then, add checksums for compressed kernels (.xz files)
+    for file in vmlinux-*.xz Image-*.xz; do
+        if [ -f "$file" ]; then
+            sha256sum "$file" >> SHA256SUMS
+        fi
+    done
+
     shopt -u nullglob
 
     if [ ! -f "SHA256SUMS" ]; then

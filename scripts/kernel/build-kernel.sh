@@ -394,6 +394,10 @@ info "Compressing kernel with xz (this may take a while)..."
 xz -9 -k -T0 "$ARTIFACTS_DIR/$OUTPUT_NAME" || error "Failed to compress kernel"
 info "Kernel compressed successfully"
 
+# Generate SHA256 checksum of compressed kernel
+info "Generating SHA256 checksum of compressed kernel..."
+(cd "$ARTIFACTS_DIR" && sha256sum "${OUTPUT_NAME}.xz" > "${OUTPUT_NAME}.xz.sha256")
+
 # Copy kernel config
 cp "$KERNEL_SRC_DIR/.config" "$ARTIFACTS_DIR/config-${KERNEL_VERSION}-${ARCH}" || error "Failed to copy kernel config"
 

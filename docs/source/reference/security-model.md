@@ -60,7 +60,9 @@ Cracker Barrel implements multi-layer verification to protect against supply cha
 **Purpose**: Verify built kernels are from Cracker Barrel CI
 
 **Process**:
-1. Generates SHA256SUMS for decompressed kernels
+1. Generates SHA256SUMS for both compressed (`.xz`) and kernel binaries
+   - Compressed checksums: Download verification
+   - Kernel binary checksums: Runtime verification
 2. Signs SHA256SUMS with Cracker Barrel release key
 3. Publishes `SHA256SUMS.asc` to GitHub Releases
 4. Users verify signature before use
