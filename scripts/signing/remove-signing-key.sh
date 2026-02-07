@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Remove local signing key and keyring (destructive operation)
 #
 # This removes:

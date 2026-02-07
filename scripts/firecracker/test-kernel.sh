@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 set -euo pipefail
 
 # Test Firecracker-compatible kernels by booting them in a Firecracker VM

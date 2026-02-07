@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: Kernel Build Request
 description: Request a build for a specific kernel version
 title: "[BUILD] Kernel version: "

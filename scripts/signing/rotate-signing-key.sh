@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Rotate signing key (generates new key and updates GitHub)
 #
 # This will:

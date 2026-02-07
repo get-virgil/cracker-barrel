@@ -976,7 +976,9 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
-This project is licensed under the MIT License. The Linux kernel itself is licensed under GPL-2.0.
+This project is licensed under the Apache License 2.0. See [LICENSE.md](LICENSE.md) for details.
+
+The Linux kernel itself is licensed under GPL-2.0.
 
 ## References
 

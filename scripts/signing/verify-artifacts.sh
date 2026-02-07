@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Verify PGP signatures on build artifacts
 #
 # This tests the complete verification workflow:

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Generate PGP signing key for kernel releases (first-time setup)
 #
 # This creates:
