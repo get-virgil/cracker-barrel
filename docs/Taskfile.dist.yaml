@@ -19,16 +19,55 @@ tasks:
       - test -f {{.SPHINX_BUILD}}
       - test -f {{.SPHINX_AUTOBUILD}}
 
-  build:
-    desc: Build documentation
+  landing-install:
+    desc: Install landing page dependencies
+    dir: landing
+    cmds:
+      - npm ci
+    status:
+      - test -d node_modules
+
+  landing-build:
+    desc: Build landing page
+    deps: [landing-install]
+    dir: landing
+    cmds:
+      - npm run build
+    sources:
+      - src/**/*
+      - public/**/*
+      - index.html
+      - vite.config.ts
+      - package.json
+    generates:
+      - dist/**/*
+
+  sphinx-build:
+    desc: Build Sphinx documentation
     deps: [install]
     cmds:
       - "{{.SPHINX_BUILD}} {{.SPHINX_OPTS}} -b html source docs"
 
+  combine:
+    desc: Combine landing page and docs into site directory
+    deps: [landing-build, sphinx-build]
+    cmds:
+      - rm -rf site
+      - mkdir -p site
+      - cp -r landing/dist/* site/
+      - mkdir -p site/docs
+      - cp -r docs/* site/docs/
+
+  build:
+    desc: Build complete documentation site (landing + docs)
+    deps: [combine]
+
   clean:
-    desc: Clean build directory
+    desc: Clean all build directories
     cmds:
       - rm -rf docs/
+      - rm -rf landing/dist/
+      - rm -rf site/
 
   linkcheck:
     desc: Check for broken links
@@ -38,15 +77,22 @@ tasks:
 
   serve:
     desc: Build and serve full site with landing page (no auto-reload)
-    deps: [install, build]
+    deps: [build]
     cmds:
-      - python -m http.server 8000 --directory .
+      - python -m http.server 8000 --directory site
 
   serve-dev:
     desc: Serve docs with live auto-reload (bypasses landing page)
     deps: [install]
     cmds:
       - "{{.SPHINX_AUTOBUILD}} source docs --port 8000"
+
+  serve-landing:
+    desc: Serve landing page with Vite dev server
+    dir: landing
+    deps: [landing-install]
+    cmds:
+      - npm run dev
 
   ci:
     desc: CI checks for documentation

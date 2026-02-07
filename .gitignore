@@ -2,6 +2,7 @@
 build/
 artifacts/
 bin/
+.task/
 
 # Local archive of signed releases (local-first development)
 # Automatically populated by sign-artifacts.sh

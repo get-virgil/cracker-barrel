@@ -3,3 +3,10 @@ docs/
 
 # Virtual environment
 .venv/
+
+# Landing site (React app)
+landing/dist/
+landing/node_modules/
+
+# Combined site output
+site/

@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Cracker Barrel'
-copyright = '2026, Kaz Walker & Cracker Barrel Team'
-author = 'Kaz Walker & Cracker Barrel Team'
+copyright = '2026, Kaz Walker'
+author = 'Kaz Walker'
 
 version = '1.0'
 release = '1.0'
