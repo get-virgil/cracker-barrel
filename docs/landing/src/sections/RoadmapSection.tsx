@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect } from 'react';
+import { useRef, useLayoutEffect, useState, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Shield, Workflow, Award } from 'lucide-react';
@@ -8,6 +8,16 @@ gsap.registerPlugin(ScrollTrigger);
 interface RoadmapSectionProps {
   className?: string;
 }
+
+interface Release {
+  date: string;
+  version: string;
+  note: string;
+  url: string;
+}
+
+const REPO_OWNER = 'get-virgil';
+const REPO_NAME = 'cracker-barrel';
 
 const stackItems = [
   {
@@ -31,6 +41,37 @@ export default function RoadmapSection({ className = '' }: RoadmapSectionProps) 
   const sectionRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+  const [releases, setReleases] = useState<Release[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch recent releases from GitHub
+  useEffect(() => {
+    const fetchReleases = async () => {
+      try {
+        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases?per_page=4`);
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+          const formattedReleases: Release[] = data.map((release: any) => ({
+            date: new Date(release.published_at).toISOString().split('T')[0],
+            version: release.tag_name,
+            note: release.name || `Linux Kernel ${release.tag_name.replace('v', '')}`,
+            url: release.html_url,
+          }));
+
+          setReleases(formattedReleases);
+        }
+      } catch (error) {
+        console.error('Failed to fetch releases:', error);
+        // Keep empty array on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchReleases();
+  }, []);
 
   useLayoutEffect(() => {
     const section = sectionRef.current;
@@ -143,21 +184,30 @@ export default function RoadmapSection({ className = '' }: RoadmapSectionProps) 
         <div className="mt-12 sm:mt-16">
           <h3 className="text-[#F4F6FA] font-bold text-lg mb-6">Recent Releases</h3>
           <div className="space-y-3">
-            {[
-              { date: '2024-01-15', version: 'v0.8.2', note: 'Fixed kernel module loading race condition' },
-              { date: '2024-01-02', version: 'v0.8.1', note: 'Added support for custom initramfs' },
-              { date: '2023-12-20', version: 'v0.8.0', note: 'New YAML schema with validation' },
-              { date: '2023-12-05', version: 'v0.7.5', note: 'Improved QEMU startup performance' },
-            ].map((release, i) => (
-              <div 
-                key={i}
-                className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm py-2 border-b border-white/[0.06] last:border-0"
-              >
-                <span className="text-[#6F7682] font-mono">{release.date}</span>
-                <span className="text-[#B9FF2C] font-mono">{release.version}</span>
-                <span className="text-[#A7ACB8]">{release.note}</span>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <p className="text-[#6F7682] text-sm">Loading releases...</p>
               </div>
-            ))}
+            ) : releases.length > 0 ? (
+              releases.map((release, i) => (
+                <a
+                  key={i}
+                  href={release.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm py-2 border-b border-white/[0.06] last:border-0 hover:bg-white/[0.02] transition-colors -mx-2 px-2 rounded"
+                >
+                  <span className="text-[#6F7682] font-mono">{release.date}</span>
+                  <span className="text-[#B9FF2C] font-mono">{release.version}</span>
+                  <span className="text-[#A7ACB8]">{release.note}</span>
+                </a>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-[#A7ACB8] text-sm mb-2">No releases yet. First kernels coming soon!</p>
+                <p className="text-[#6F7682] text-xs">Check back after the signing key is generated.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
